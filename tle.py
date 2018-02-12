@@ -52,7 +52,7 @@ def get_tle(str_date, sc_id):
 
     return response.text
 
-def get_ephemeris(str_sc_name, str_date, str_time, fl_name):
+def get_ephemeris(str_sc_name, str_date, str_time, path):
 
     dic_sc = {
         'Fermi': '33053', 
@@ -69,18 +69,18 @@ def get_ephemeris(str_sc_name, str_date, str_time, fl_name):
 
     sc_id = dic_sc[str_sc_name]
 
-    tle_file_name = "{:s}_{:s}.tle".format(str_date, str_sc_name)
-    eph_file_name = "{:s}_{:s}.eph".format(str_date, str_sc_name)
-    list_file_name = "{:s}_list.txt".format(str_sc_name)
+    tle_file_name = "{:s}/{:s}_{:s}.tle".format(path, str_date, str_sc_name)
+    eph_file_name = "{:s}/{:s}_{:s}.eph".format(path, str_date, str_sc_name)
+    list_file_name = "{:s}/{:s}_list.txt".format(path, str_sc_name)
 
-    with open(os.getcwd()+'/'+fl_name+'/'+list_file_name,'w') as f:
+    with open(list_file_name,'w') as f:
         f.write("%s %s\n" % (str_date, str_time))
 
     text_tle = get_tle(str_date, sc_id)
     if not text_tle:
         return (list_file_name, None, None)
 
-    with open(os.getcwd()+'/'+fl_name+'/'+tle_file_name,'w') as f:
+    with open(tle_file_name,'w') as f:
         f.write(text_tle)
 
     #str_run = 'c:/work/Utilities/GetSCEphemeris/GetSCEphemeris4List.exe'

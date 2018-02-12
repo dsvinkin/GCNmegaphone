@@ -19,7 +19,7 @@ import gcn.notice_types
 import telebot
 
 import get_fermi
-import get_integral 
+import get_integral
 
 # Parameters of the log file
 log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u'log.txt')
@@ -43,8 +43,8 @@ ArrayType = {
      }
 
 ArrayParam = {
-    'Packet_Type': 'NOTICE_TYPE:', 
-    'TrigID': 'TRIGGER_NUM:',
+    'Packet_Type': 'NOTICE_TYPE', 
+    'TrigID': 'TRIGGER_NUM',
     'Sun_Distance': 'SUN_DIST', 
     'Sun_Hr_Angle': 'SUN_ANGLE',
     'Galactic_Long': 'GAL_LONG', 
@@ -57,7 +57,8 @@ ArrayParam = {
     'Data_Signif': 'DATA_SIGNIF',
     'Most_Likely_Index': 'MOST_LIKELY', 
     'Most_Likely_Prob': 'MOST_LIKELY_PROB',
-    'Sec_Most_Likely_Index': '2nd_MOST_LIKELY', 
+    'Sec_Most_Likely_Index': '2nd_MOST_LIKELY',
+    'Sec_Most_Likely_Prob': '2nd_MOST_LIKELY_PROB',
     'MOON_Distance': 'MOON_DIST',
     'C1':'GRB_RA',
     'C2':'GRB_DEC',
@@ -100,57 +101,63 @@ AllIndex = {
     }
 
 
-def get_folder_name(dt_str):
+def get_event_name(str_date_time):
 
-    dt, _, us = dt_str.partition(".")
-    dt = datetime.datetime.strptime(dt, "%Y-%m-%dT%H:%M:%S")
-    part_day = int(round((dt.hour*60+dt.minute+dt.second/60.0)/1.44))
+    time = datetime.datetime.strptime(str_date_time, "%Y-%m-%dT%H:%M:%S.%f")
+    part_day = int(round((time.hour*60 + time.minute + time.second/60.0) / 1.44))
   
-    # date - format yymmddttt
-    date = "{:s}{:03d}".format(dt.strftime('%y%m%d'), part_day)
-    time_sec = dt.hour*3600+dt.minute*60+dt.second
+    # gbm_name - format yymmddttt
+    gbm_name = "{:s}{:03d}".format(time.strftime('%y%m%d'), part_day)
+    date = time.strftime('%Y%m%d')
+    time_sec = time.hour * 3600 + time.minute * 60 + time.second + time.microsecond/1e6
   
     # name - format GRByymmdd_sssss
-    name = "GRB{:s}_{:05d}".format(dt.strftime('%y%m%d'), time_sec)
+    name = "GRB{:s}_T{:05d}".format(time.strftime('%Y%m%d'), int(time_sec))
   
-    return date, name
-
+    return name, gbm_name, date, time_sec
 
 def send_to_telegram(text):
 
     bot.send_message(chat_id, text)
 
-def run_download_gbm_thread(Date_event, Name_event):
+def run_download_gbm_thread(event_name, event_gbm_name, date, time, path):
 
     global Temp_date_fermi_integral
       
-    thread_fermi = threading.Thread(target = get_fermi.download_fermi, args = (Date_event, Name_event,))
-    thread_integral = threading.Thread(target = get_integral.download_integral, args = (Name_event, 200,))
+    #thread_fermi = threading.Thread(target = get_fermi.download_fermi, args = (event_name, event_gbm_name, path))
+    #thread_integral = threading.Thread(target = get_integral.download_integral, args = (date, time, 200, path))
+
+    get_fermi.download_fermi(date, event_gbm_name, path)
+    get_integral.download_integral(date, time, 200, path)
+    return
   
-    if (Temp_date_fermi_integral != Date_event and not thread_fermi.is_alive()):
+    if (Temp_date_fermi_integral != event_name and not thread_fermi.is_alive()):
   
         thread_fermi.start()
-        log.info ("The thread {:s} started".format(Date_event+'_FER'))
+        log.info ("The thread {:s} started".format(event_name+'_FER'))
   
-        if (Temp_date_fermi_integral != Date_event and not thread_integral.is_alive()):
+        if (Temp_date_fermi_integral != event_name and not thread_integral.is_alive()):
             thread_integral.start()
-            log.info("The thread {:s} started".format(Date_event+'_INT'))
-            Temp_date_fermi_integral = Date_event
+            log.info("The thread {:s} started".format(event_name+'_INT'))
+            Temp_date_fermi_integral = event_name
 
         else:
-            log.info ("The thread {:s} is already working".format(Date_event+'_INT'))
+            log.info ("The thread {:s} is already working".format(event_name+'_INT'))
     else:
-        log.info ("The thread {:s} is already working".format(Date_event+'_FER'))
+        log.info ("The thread {:s} is already working".format(event_name+'_FER'))
 
-def run_download_int_thread(Date_event, Name_event):
+def run_download_int_thread(event_name, date, time, path):
   
     global Temp_date_integral
-    thread_integral = threading.Thread(target = get_integral.download_integral, args = (Name_event, 200,))
-    
-    if (Temp_date_integral != Date_event and not thread_integral.is_alive()):
+    #thread_integral = threading.Thread(target = get_integral.download_integral, args=(date, time, 200, path))
+
+    get_integral.download_integral(date, time, 200, path)
+    return
+
+    if (Temp_date_integral != event_name and not thread_integral.is_alive()):
         thread_integral.start()
-        log.info ("The thread {:s} started".format(Date_event+'_INT'))
-        Temp_date_integral = Date_event
+        log.info ("The thread {:s} started".format(event_name + '_INT'))
+        Temp_date_integral = event_name
     
     else:
         log.info ("The thread {:s} is already working".format(Date_event+'_INT'))
@@ -163,8 +170,9 @@ class notice:
 
         self.dict_par = OrderedDict()
         self._update_dict(tree, self.dict_par)
+        #print (self.dict_par)
 
-        self.role = self.dict_par['role']
+        self.role = tree.attrib['role']
 
     def _update_dict(self, element, my_dict):
         """
@@ -175,7 +183,7 @@ class notice:
             for subelement in element:
                 # That's where the recursion happens. We're calling the same
                 # function for a subelement of the element.
-                update_dict(subelement, my_dict)
+                self._update_dict(subelement, my_dict)
     
         else:  # Otherwise, subtree is a leaf.
             #print (element.tag,':', element.text, element.attrib)
@@ -184,42 +192,45 @@ class notice:
                 name = element.tag
                 name = re.sub(r"{.+?}","",name)
                 my_dict[name] = element.text
-                print (name,':', element.text)
+                #print (name,':', element.text)
             elif element.attrib:
                 name = element.attrib.get('name',None)
                 val = element.attrib.get('value',None)
                 if name and val:
-                    print (name,':', val)
+                    #print (name,':', val)
                     my_dict[name] = val
 
     def _qw(self, s):
         return s.split()
 
     def get_value(self, key):
-        self.dict_par.get(key, None)
+        return self.dict_par.get(key, None)
 
     def get_event_time(self):
-        self.dict_par.get('ISOTime', None)
+        return self.dict_par.get('ISOTime', None)
 
     def print_param(self, key, f):
 
         name = ArrayParam[key]
         val = self.dict_par[key]
+        
+        if (key == 'Packet_Type'):
+            print("{:22s} {:s}".format(name, ArrayType[val]), file=f)
 
-        if (key == 'Most_Likely_Index'):
-            print("{:21s} {:s}".format(name, GoodIndex[val]), file=f)
+        elif (key == 'Most_Likely_Index'):
+            print("{:22s} {:s}".format(name, GoodIndex[val]), file=f)
     
         elif (key == 'Sec_Most_Likely_Index'):
-            print("{:21s} {:s}".format(name, AllIndex[val]), file=f)
+            print("{:22s} {:s}".format(name, AllIndex[val]), file=f)
     
         else:
-            print("{:21s} {:s}".format(name, val), file=f)
+            print("{:22s} {:s}".format(name, val), file=f)
     
     def append_info_to_file(self, file_name):
 
        lst_to_print = self._qw('Packet_Type TrigID  ISOTime '+ 
             'Trig_Timescale Data_Timescale Data_Signif '+
-            'Most_Likely_Index Most_Likely_Prob Sec_Most_Likely_Index '+
+            'Most_Likely_Index Most_Likely_Prob Sec_Most_Likely_Index Sec_Most_Likely_Prob '+
             'C1 C2 Error2Radius '+
             'Sun_Distance Galactic_Long Galactic_Lat Ecliptic_Long Ecliptic_Lat'
              )
@@ -228,26 +239,27 @@ class notice:
           print(" --- The begin message --- ", file=f)
       
           for key in lst_to_print:
-              print_param(key, f)
+              self.print_param(key, f)
       
           print(" --- The end message --- \n", file=f)
     
 # Function to call every time a GCN is received.
 @gcn.handlers.include_notice_types(
-	gcn.notice_types.IPN_RAW,
-	gcn.notice_types.FERMI_GBM_FLT_POS,
-	gcn.notice_types.FERMI_GBM_GND_POS,
-	gcn.notice_types.FERMI_GBM_FIN_POS,
-	gcn.notice_types.INTEGRAL_SPIACS)
-	
+    gcn.notice_types.IPN_RAW,
+    gcn.notice_types.FERMI_GBM_FLT_POS,
+    gcn.notice_types.FERMI_GBM_GND_POS,
+    gcn.notice_types.FERMI_GBM_FIN_POS,
+    gcn.notice_types.INTEGRAL_SPIACS)
+
 def process_gcn(payload, root):
 
     data = notice(payload)
   
     # Respond to only real 'observation' events
     if (data.role != 'observation'):
+        print ("data.role != observation")
         return
-  
+
     # Respond to only Most_Likely_Index = GoodIndex, Data_Timescale > 1.024, Data_Signif > 20.
     MOST_LIKELY_IND = data.get_value('Most_Likely_Index')
     if MOST_LIKELY_IND not in GoodIndex:
@@ -256,11 +268,11 @@ def process_gcn(payload, root):
     else:
         log.info ("Most_Likely_Index = {:s}".format(MOST_LIKELY_IND))
   
-    Notice_type = data.get_value('Packet_Type')
+    notice_type = ArrayType[data.get_value('Packet_Type')]
     event_date_time = data.get_event_time()
 
     #Download data and send Telegram notification for bright events only
-    if Notice_type == 'FERMI GBM FLT POS':
+    if notice_type == 'FERMI GBM FLT POS':
         DATA_TIMESCALE = float(data.get_value('Data_Timescale'))
         DATA_SIGNIF = float(data.get_value('Data_Signif'))
   
@@ -269,32 +281,40 @@ def process_gcn(payload, root):
             return
         else:
             log.info ("Data_Timescale = {:.3f}, Data_Signif = {:.3f}".format(DATA_TIMESCALE, DATA_SIGNIF))
-            send_to_telegram("Message type: {:s}, {:s}, data timescale = {:8.3f}, data signif = {:8.1f}".format(
-              Notice_type, event_date_time, DATA_TIMESCALE, DATA_SIGNIF))
+        #    send_to_telegram("Message type: {:s}, {:s}\ndata timescale = {:8.3f}, data signif = {:8.1f}".format(
+        #      notice_type, event_date_time, DATA_TIMESCALE, DATA_SIGNIF))
     else:
-        send_to_telegram("Type of received messages is {:s}, {:s}".format(Notice_type, event_date_time))
+        #send_to_telegram("Type of received messages is {:s}, {:s}".format(notice_type, event_date_time))
+        pass
+
+    event_name, event_gbm_name, event_date, event_time = get_event_name(event_date_time)
+    print(event_name, event_gbm_name, event_date, event_time)
+    #return
+
+    log.info("Type of received messages is {:s}, {:s}".format(notice_type, event_name))
   
-    Date_event, Name_event = get_folder_name(event_date_time)
-    log.info("Type of received messages is {:s}, {:s}".format(Notice_type, Name_event))
+    path = "../{:s}".format(event_name)
   
-    path = "./{:s}".format(Name_event)
-  
-    if not os.path.exists(Path):
-        os.mkdir(Path)
-        log.info ("The folder {:s} is created".format(Name_event))
+    if not os.path.exists(path):
+        os.mkdir(path)
+        log.info ("The folder {:s} is created".format(event_name))
   
     # Creating file with all notices and parse the message
-    file_name = "{:s}/{:s}_{:s}.txt".format(Path, Name_event, Notice_type[:3])
-    append_info_to_file(file_name, data.lst_par)
+    file_name = "{:s}/{:s}_{:s}.txt".format(path, event_name, notice_type[:3])
+    data.append_info_to_file(file_name)
 
     # Download data
-    if (Notice_type == ('FERMI GBM FLT POS' or 'FERMI GBM GND POS' or 'FERMI GBM FIN POS')):
-        run_download_gbm_thread(Date_event, Name_event)
+    run_download_gbm_thread(event_name, event_gbm_name, event_date, int(event_time), path)
+    #run_download_int_thread(event_name, event_date, int(event_time), path)
+    return
+
+    if (notice_type in ('FERMI GBM FLT POS', 'FERMI GBM GND POS', 'FERMI GBM FIN POS')):
+        run_download_gbm_thread(event_name, event_gbm_name, event_date, int(event_time), path)
     
-    elif (Notice_type == 'INTEGRAL SPIACS'):
-        run_download_int_thread(Date_event, Name_event)
+    elif (notice_type == 'INTEGRAL SPIACS'):
+        run_download_int_thread(event_name, event_date, int(event_time), path)
 
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
     # Listen for GCNs until the program is interrupted (killed or interrupted with control-C).
     gcn.listen(handler=process_gcn)

@@ -3,9 +3,10 @@
 Test for notice_filter.py
 """
 import gcn
-import notice_filter2
+import notice_filter
 
-payload = '''<?xml version = '1.0' encoding = 'UTF-8'?>
+payload = '''\
+<?xml version = '1.0' encoding = 'UTF-8'?>
 <voe:VOEvent
       ivorn="ivo://nasa.gsfc.gcn/Fermi#GBM_Flt_Pos_2011-09-04T03:54:36.02_336801278_45-956"
       role="observation" version="1.1"
@@ -120,10 +121,11 @@ payload = '''<?xml version = '1.0' encoding = 'UTF-8'?>
   <Description>
   </Description>
 </voe:VOEvent>
-'''.encode('UTF-8')
+'''
 
 date_time = '2018-02-10T12:24:38.55' 
 payload = payload.format(date_time)
+payload = payload.encode('UTF-8')
 
 root = gcn.voeventclient.parse_from_string(payload)
-process_gcn(payload, root)
+notice_filter.process_gcn(payload, root)
