@@ -29,8 +29,8 @@ token = '408065188:AAGqxghhuzEBZUj-l17KNrBw7dAsbAOHLGE'
 chat_id = 235646475
 bot = telebot.TeleBot(token)
 
-Temp_date_fermi_integral = None
-Temp_date_integral = None
+current_event_fermi_integral = None
+current_event_integral = None
 
 ArrayType = {
     '31': 'IPN RAW', 
@@ -122,24 +122,23 @@ def send_to_telegram(text):
 
 def run_download_gbm_thread(event_name, event_gbm_name, date, time, path):
 
-    global Temp_date_fermi_integral
+    global current_event_fermi_integral
       
-    #thread_fermi = threading.Thread(target = get_fermi.download_fermi, args = (event_name, event_gbm_name, path))
-    #thread_integral = threading.Thread(target = get_integral.download_integral, args = (date, time, 200, path))
+    thread_fermi = threading.Thread(target = get_fermi.download_fermi, args = (event_name, event_gbm_name, path))
+    thread_integral = threading.Thread(target = get_integral.download_integral, args = (date, time, 200, path))
 
     get_fermi.download_fermi(date, event_gbm_name, path)
     get_integral.download_integral(date, time, 200, path)
     return
   
-    if (Temp_date_fermi_integral != event_name and not thread_fermi.is_alive()):
-  
+    if (current_event_fermi_integral != event_name and not thread_fermi.is_alive()):
         thread_fermi.start()
         log.info ("The thread {:s} started".format(event_name+'_FER'))
   
-        if (Temp_date_fermi_integral != event_name and not thread_integral.is_alive()):
+        if (current_event_fermi_integral != event_name and not thread_integral.is_alive()):
             thread_integral.start()
             log.info("The thread {:s} started".format(event_name+'_INT'))
-            Temp_date_fermi_integral = event_name
+            current_event_fermi_integral = event_name
 
         else:
             log.info ("The thread {:s} is already working".format(event_name+'_INT'))
@@ -148,16 +147,13 @@ def run_download_gbm_thread(event_name, event_gbm_name, date, time, path):
 
 def run_download_int_thread(event_name, date, time, path):
   
-    global Temp_date_integral
-    #thread_integral = threading.Thread(target = get_integral.download_integral, args=(date, time, 200, path))
+    global current_event_integral
+    thread_integral = threading.Thread(target = get_integral.download_integral, args=(date, time, 200, path))
 
-    get_integral.download_integral(date, time, 200, path)
-    return
-
-    if (Temp_date_integral != event_name and not thread_integral.is_alive()):
+    if (current_event_integral != event_name and not thread_integral.is_alive()):
         thread_integral.start()
         log.info ("The thread {:s} started".format(event_name + '_INT'))
-        Temp_date_integral = event_name
+        current_event_integral = event_name
     
     else:
         log.info ("The thread {:s} is already working".format(Date_event+'_INT'))
@@ -313,7 +309,6 @@ def process_gcn(payload, root):
     
     elif (notice_type == 'INTEGRAL SPIACS'):
         run_download_int_thread(event_name, event_date, int(event_time), path)
-
 
 if __name__ == "__main__":
     # Listen for GCNs until the program is interrupted (killed or interrupted with control-C).

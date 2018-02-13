@@ -1,4 +1,10 @@
 # -*- coding: utf-8 -*-
+
+"""
+    GBMTTEFile class was implemented by M. Burgess
+    in https://github.com/giacomov/3ML
+"""
+
 from __future__ import print_function
 
 import astropy.io.fits as fits
@@ -162,7 +168,6 @@ def equat2eclipt(fRA, fDec):
     fB = rad2deg(np.arcsin(-cosDec * sinRA * sinEps + sinDec * cosEps))
     
     if (fL < 0):
-
         fL += 360
 
     return fL, fB
@@ -176,17 +181,13 @@ def print_data(folder, file, bins, mas, bounds, resolution):
     with open(folder+'GRB'+file[13:19]+'_GBM_'+resolution+'ms.thr', 'w') as f:
 
         print("SrcName: GRB{}".format(file[13:22]), file = f)
-
         print("T0 = {:.3f} MET".format(tte.trigger_time), file = f)
-
         print("{:>11} {:>6.1f} {:>6.1f} {:>6.1f}".format('Emin (keV):', tte.emin[bounds[0][0]],
                                       tte.emin[bounds[1][0]], tte.emin[bounds[2][0]]), file = f)
-
         print("{:>11} {:>6.1f} {:>6.1f} {:>6.1f}".format('Emax (keV):', tte.emax[bounds[0][1]],
                                       tte.emax[bounds[1][1]], tte.emax[bounds[2][1]]), file = f)
 
         for el in range(len(mas[0])):
-
             print("{:<11.3f} {:>6} {:>6} {:>6}".format(bins[el], mas[0][el], mas[1][el], mas[2][el]), file = f)
 
     print('File GRB'+file[13:19]+'_GBM_'+resolution+'ms.thr is created!')
@@ -195,21 +196,16 @@ def print_data(folder, file, bins, mas, bounds, resolution):
 def tte_lightcurve(folder, file, start = -10, stop = 100, dt = 1, channel_start = 0, channel_end = 127):
 
     tte = GBMTTEFile(ttefile = folder+file)
-
     bins = np.arange(start, stop, step = dt)
-
     arrival_times = []
 
     for i in range(len(tte.energies)):
 
         if channel_start <= tte.energies[i] <= channel_end:
-
             arrival_times.append(tte.arrival_times[i] - tte.trigger_time)
 
     counts, bins = np.histogram(np.array(arrival_times), bins = bins)
-
     width = np.diff(bins)
-
     time_bins = np.array(list(zip(bins[:-1], bins[1:])))
 
     return counts, bins
@@ -218,30 +214,23 @@ def tte_lightcurve(folder, file, start = -10, stop = 100, dt = 1, channel_start 
 def temporal_history(folder, file, detectors, resolution, bounds):
 
     for r in range(len(resolution)):
-
         all_mas = []
 
         for d in detectors:
-
             current_file = file[0:9]+d+file[10:]
-
             mas = []
 
             for b in range(len(bounds)):
-
                 counts, bins = tte_lightcurve(folder, current_file, start = resolution[r][0], stop = resolution[r][1],
                               dt = resolution[r][2]/1000., channel_start = bounds[b][0], channel_end = bounds[b][1])
 
                 mas.append([0] * len(counts))
-
                 mas[b] = counts
 
             all_mas.extend(mas)
 
         for el in range(len(all_mas[0])):
-
             for l in range(3, len(all_mas), 3):
-
                 all_mas[0][el] += all_mas[l][el]
                 all_mas[1][el] += all_mas[l+1][el]
                 all_mas[2][el] += all_mas[l+2][el]
@@ -249,7 +238,6 @@ def temporal_history(folder, file, detectors, resolution, bounds):
         mas = []
 
         for i in range(3):
-
             mas.append(all_mas[i])
 
         print_data(folder, file, bins, mas, bounds, str(resolution[r][2]))
@@ -287,7 +275,6 @@ def get_detectors(folder, file_name):
 
     return detectors
 
-
 def tte_to_ascii(folder, file):
 
     if folder != '':
@@ -301,7 +288,6 @@ def tte_to_ascii(folder, file):
     if GRB_data == None:
         RA = data_input('RA')
         Dec = data_input('Dec')
-
     else:
         RA, Dec = get_coordinates(folder, GRB_data)
 
@@ -309,7 +295,6 @@ def tte_to_ascii(folder, file):
 
     if Dec >= 0:
         bounds = [[15, 42], [43, 85], [86, 126]]
-
     else:
         bounds = [[16, 45], [46, 91], [92, 126]]
 
@@ -353,8 +338,8 @@ def get_coordinates(folder, file):
 
     with open(folder+file, 'r') as f:
 
-        grb_ra = 'GRB_RA:'
-        grb_dec = 'GRB_DEC:'
+        grb_ra = 'GRB_RA'
+        grb_dec = 'GRB_DEC'
 
         try:
             for line in f:
@@ -375,8 +360,8 @@ def get_coordinates(folder, file):
 
 if __name__ == "__main__":
 
-    folder_path = ''
+    folder_path = '../GRB20180210_T44678'
 
     first_tte_file = get_files(folder_path, pattern='glg_tte_n')
 
-    delimitation(folder_path, first_tte_file)
+    tte_to_ascii(folder_path, first_tte_file)
