@@ -12,7 +12,7 @@ import clock
 import tle
 import gbm_tte
 
-data_download_delay = 1 #600 # s = 10 min
+data_download_delay = 600 # s = 10 min
 
 log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u'log.txt')
 

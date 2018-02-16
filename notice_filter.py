@@ -22,7 +22,8 @@ import get_fermi
 import get_integral
 
 # Parameters of the log file
-log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u'log.txt')
+#log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u'log.txt')
+log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.DEBUG, filename = u'log.txt')
 
 # Telegram parameters
 token = '408065188:AAGqxghhuzEBZUj-l17KNrBw7dAsbAOHLGE'
@@ -162,6 +163,7 @@ def run_download_int_thread(event_name, date, time, path):
 class notice:
 
     def __init__(self, payload):
+        self.payload = payload
         tree = etree.XML(payload) 
 
         self.dict_par = OrderedDict()
@@ -169,6 +171,11 @@ class notice:
         #print (self.dict_par)
 
         self.role = tree.attrib['role']
+
+    def append_payload_to_file(self,file_name):
+        with open(file_name, 'a') as f:
+          print("-------------------------------", file=f)
+          print(self.payload, file=f)
 
     def _update_dict(self, element, my_dict):
         """
@@ -232,12 +239,14 @@ class notice:
              )
 
        with open(file_name, 'a') as f:
-          print(" --- The begin message --- ", file=f)
+          now = datetime.utcnow()
+          print("{:22s} {:s}".format('Timestamp', now), file=f)
       
           for key in lst_to_print:
               self.print_param(key, f)
       
-          print(" --- The end message --- \n", file=f)
+          print("-----------------------------\n", file=f)
+
     
 # Function to call every time a GCN is received.
 @gcn.handlers.include_notice_types(
@@ -250,65 +259,50 @@ class notice:
 def process_gcn(payload, root):
 
     data = notice(payload)
-  
+    data.append_payload_to_file('raw_notices.txt')
+
     # Respond to only real 'observation' events
     if (data.role != 'observation'):
-        print ("data.role != observation")
+        #print ("data.role != observation")
         return
-
-    # Respond to only Most_Likely_Index = GoodIndex, Data_Timescale > 1.024, Data_Signif > 20.
-    MOST_LIKELY_IND = data.get_value('Most_Likely_Index')
-    if MOST_LIKELY_IND not in GoodIndex:
-        log.info ("Most_Likely_Index = {:s}, folder not created!".format(MOST_LIKELY_IND))
-        return
-    else:
-        log.info ("Most_Likely_Index = {:s}".format(MOST_LIKELY_IND))
   
     notice_type = ArrayType[data.get_value('Packet_Type')]
     event_date_time = data.get_event_time()
 
-    #Download data and send Telegram notification for bright events only
-    if notice_type == 'FERMI GBM FLT POS':
-        DATA_TIMESCALE = float(data.get_value('Data_Timescale'))
-        DATA_SIGNIF = float(data.get_value('Data_Signif'))
-  
-        if (DATA_SIGNIF < 20.00 and DATA_TIMESCALE > 1.024):
-            log.info ("Data_Timescale = {:.3f}, Data_Signif = {:.3f} folder not created!".format(DATA_TIMESCALE, DATA_SIGNIF))
-            return
-        else:
-            log.info ("Data_Timescale = {:.3f}, Data_Signif = {:.3f}".format(DATA_TIMESCALE, DATA_SIGNIF))
-        #    send_to_telegram("Message type: {:s}, {:s}\ndata timescale = {:8.3f}, data signif = {:8.1f}".format(
-        #      notice_type, event_date_time, DATA_TIMESCALE, DATA_SIGNIF))
-    else:
-        #send_to_telegram("Type of received messages is {:s}, {:s}".format(notice_type, event_date_time))
-        pass
-
     event_name, event_gbm_name, event_date, event_time = get_event_name(event_date_time)
     print(event_name, event_gbm_name, event_date, event_time)
-    #return
+    log.info("Received message info: {:s} {:s} {:s} {:s} {:8.3f}".format(notice_type, event_name, event_gbm_name, event_date, event_time))
 
-    log.info("Type of received messages is {:s}, {:s}".format(notice_type, event_name))
+    # Respond to only Most_Likely_Index = GoodIndex
+    MOST_LIKELY_IND = data.get_value('Most_Likely_Index')
+    if MOST_LIKELY_IND and MOST_LIKELY_IND not in GoodIndex:
+        log.info ("MOST_LIKELY_IND is {:s} ({:s}), skip this event!".format(MOST_LIKELY_IND, AllIndex.get(MOST_LIKELY_IND, 'N/A')))
+        return
+    else:
+        log.info ("MOST_LIKELY_IND is {:s} ({:s}), write event info to a file.".format(MOST_LIKELY_IND, AllIndex.get(MOST_LIKELY_IND, 'N/A')))
   
     path = "../{:s}".format(event_name)
-  
     if not os.path.exists(path):
         os.mkdir(path)
         log.info ("The folder {:s} is created".format(event_name))
   
-    # Creating file with all notices and parse the message
+    # Create file with all notices and parse the message
     file_name = "{:s}/{:s}_{:s}.txt".format(path, event_name, notice_type[:3])
     data.append_info_to_file(file_name)
 
-    # Download data
-    run_download_gbm_thread(event_name, event_gbm_name, event_date, int(event_time), path)
-    #run_download_int_thread(event_name, event_date, int(event_time), path)
-    return
-
-    if (notice_type in ('FERMI GBM FLT POS', 'FERMI GBM GND POS', 'FERMI GBM FIN POS')):
+    #Download data and send Telegram notification
+    if notice_type in ('FERMI GBM FLT POS', 'FERMI GBM GND POS', 'FERMI GBM FIN POS'):
+        DATA_TIMESCALE = float(data.get_value('Data_Timescale'))
+        DATA_SIGNIF = float(data.get_value('Data_Signif'))
+        log.info("{:s} DATA_TIMESCALE: {:.3f} DATA_SIGNIF: {:.3f}".format(notice_type, DATA_TIMESCALE, DATA_SIGNIF))
         run_download_gbm_thread(event_name, event_gbm_name, event_date, int(event_time), path)
-    
-    elif (notice_type == 'INTEGRAL SPIACS'):
+
+        if (DATA_SIGNIF > 20.0 or DATA_TIMESCALE < 1.024):
+            send_to_telegram("Message type: {:s}\n{:s}\nDATA_TIMESCALE: {:8.3f}\nDATA_SIGNIF: {:8.1f}".format(
+                notice_type, event_date_time, DATA_TIMESCALE, DATA_SIGNIF))
+    elif notice_type == 'INTEGRAL SPIACS':
         run_download_int_thread(event_name, event_date, int(event_time), path)
+        
 
 if __name__ == "__main__":
     # Listen for GCNs until the program is interrupted (killed or interrupted with control-C).
