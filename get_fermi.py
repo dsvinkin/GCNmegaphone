@@ -12,7 +12,7 @@ import clock
 import tle
 import gbm_tte
 
-data_download_delay = 600 # s = 10 min
+data_download_delay = 1200 # s 
 
 log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u'log.txt')
 
@@ -71,12 +71,18 @@ def all_files_are_downloaded(path):
         check = True
     return check
 
-def download_fermi(date, name, path):
-    print(date, name, path)
-    ftp_dir = "fermi/data/gbm/triggers/{:s}/bn{:s}/current".format(date[0:4], name)
+def download_fermi(name, path):
+    #print(name, path)
+    ftp_dir = "fermi/data/gbm/triggers/20{:s}/bn{:s}/current".format(name[0:2], name)
     k = 0
+    k_max = 20
+
     while not all_files_are_downloaded(path):
-        sleep(data_download_delay)
+        k += 1
+        if k > k_max:
+            log.info("Failed to download data from the folder bn{:s}".format(name))
+            break
+
         log.info ("Connecting ...")
         ftp = FTP('legacy.gsfc.nasa.gov')
         ftp.login()
@@ -84,7 +90,7 @@ def download_fermi(date, name, path):
 
         try:
             ftp.cwd(ftp_dir)
-            log.info("Path of the directory = {:s}".format(ftp_dir))
+            log.info("Path of the ftp directory {:s}".format(ftp_dir))
       
             lc_tot_ftp = nlst(ftp, 'glg_lc_tot*pdf')
             trigdat_all_ftp = nlst(ftp, 'glg_trigdat_all*fit')
@@ -99,16 +105,14 @@ def download_fermi(date, name, path):
             download(ftp, path, tte_n_ftp, 'glg_tte_n')
 
             ftp.quit()
-            log.info ("Disconnect")
+            log.info("Disconnect")
 
-        except ftplib.error_perm:
-            log.info ("Maybe the folder {:s} is not created! Wait ...".format(date))
+        except ftplib.error_perm as e:
+            log.info("Got error {:s}. Maybe the folder bn{:s} is not created! Wait ...".format(str(e), name))
             ftp.quit()
-            log.info ("Disconnect")
-        k += 1
-        if k > 2:
-            log.info("Failed to download data from the folder bn{:s}".format(name))
-            break
+
+        if k > 1:
+            sleep(data_download_delay)
 
     if all_files_are_downloaded(path):
         log.info ("The thread bn{:s} finale!".format(name))

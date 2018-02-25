@@ -7,7 +7,7 @@ import os
 from time import sleep
 
 timeout = 30 # s
-data_download_delay = 1 #600 # s = 10 min
+data_download_delay = 2400 # s = 10 min
  
 log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u'log.txt')
 
@@ -21,18 +21,18 @@ def GetInHMS(seconds, use_codes=False):
     else:
         return "{:02d}:{:02d}:{:02.0f}".format(hours, minutes, seconds)
 
-def check(file_name, k):
-    check = True
-    size = 0
+def thr_is_ok(file_name):
 
+    size = 0
     if os.path.isfile(file_name): 
         size = os.path.getsize(file_name)
+    
+    log.info("File {:s} has size: {:d} B".format(file_name, size))
 
-    if (size >= 120000) or (k > 24):
-        check = False
-
-    #print(file_name, os.path.isfile(file_name),size)
-    return check
+    if (size >= 120 * 1024):
+        return True
+    else:
+        return False
 
 def download_integral(date, time, interval, path):
     """
@@ -48,15 +48,17 @@ def download_integral(date, time, interval, path):
     Name_event = "GRB{:s}_T{:05d}".format(date,time)
 
     proxy = {'http': 'http://www-proxy:3128'}
+
     k = 0
+    k_max = 24
+
     thr_file = "{:s}_{:05d}_INT.thr".format(date, time)
     eph_file = "{:s}_{:05d}_INT.eph".format(date, time)
 
-    while check(path+'/'+thr_file, k):
+    while (not thr_is_ok(path+'/'+thr_file) and k <= k_max):
         k += 1
-        sleep(data_download_delay)
         # get lc
-        print ('get lc')
+        #print ('get lc')
         utc = "{:s}T{:s} {:d}".format(date_dashed, time_hhmmss, int(interval))
         log.info (utc)
         data = {'requeststring': utc, 'submit':'Submit', 'generate':'ipnlc'}
@@ -66,7 +68,7 @@ def download_integral(date, time, interval, path):
 
         with open(path+'/'+thr_file, 'w') as f:
             f.write(text)
-        log.info (Name_event+" thr has been downloaded")
+        log.info(thr_file+" has been downloaded")
         
         # get eph
         utc = "{:s}T{:s}".format(date_dashed, time_hhmmss, int(interval))
@@ -78,10 +80,16 @@ def download_integral(date, time, interval, path):
         with open(path+'/'+eph_file, 'w') as f:
             f.write("%s %s\n" %(date_dashed, time))
             f.write(text)
-        log.info (Name_event+" eph has been downloaded")
+        log.info (eph_file+" has been downloaded")
 
-    if not check(thr_file, k):
-        log.info ("The thread {:s} finale!".format(Name_event+'_INT'))
+        if k > 1:
+            sleep(data_download_delay)
+
+    if thr_is_ok(path+'/'+thr_file):
+        log.info("The {:s} has good size.".format(thr_file))
+        log.info ("The thread {:s}_INT finale!".format(Name_event))
+    else:
+        log.info ("Failed to download SPI-ACS data for {:s}.".format(Name_event))
 
 def test():
     date = '20171029'
