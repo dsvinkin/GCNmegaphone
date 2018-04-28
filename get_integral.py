@@ -7,7 +7,7 @@ import os
 from time import sleep
 
 timeout = 30 # s
-data_download_delay = 2400 # s = 10 min
+data_download_delay = 2400 # s
  
 log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u'log.txt')
 
@@ -50,7 +50,7 @@ def download_integral(date, time, interval, path):
     proxy = {'http': 'http://www-proxy:3128'}
 
     k = 0
-    k_max = 24
+    k_max = 30
 
     thr_file = "{:s}_{:05d}_INT.thr".format(date, time)
     eph_file = "{:s}_{:05d}_INT.eph".format(date, time)

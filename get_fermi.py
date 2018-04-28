@@ -75,7 +75,7 @@ def download_fermi(name, path):
     #print(name, path)
     ftp_dir = "fermi/data/gbm/triggers/20{:s}/bn{:s}/current".format(name[0:2], name)
     k = 0
-    k_max = 20
+    k_max = 30
 
     while not all_files_are_downloaded(path):
         k += 1
@@ -125,7 +125,8 @@ def download_fermi(name, path):
 
 if __name__ == '__main__':
 
-    event_gbm_name = '171025416'
-    event_name = 'GRB171025_35940'
+    event_gbm_name = '180305393'
+    path = '../GRB20180305_T33968'
 
-    download_fermi(event_gbm_name, event_name)
+    download_fermi(event_gbm_name, path)
+    #eph(('glg_trigdat_all_bn180227211_v01.fit',''), path)

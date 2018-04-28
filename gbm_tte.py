@@ -282,7 +282,10 @@ def tte_to_ascii(folder, file):
 
     file_detectors = get_files(folder)
     detectors = get_detectors(folder, file_detectors)
-    resolution = [[-1, 1, 2], [-5, 50, 16], [-10, 60, 64], [-10, 100, 256]]
+    #resolution = [[-1, 1, 2], [-5, 50, 16], [-10, 100, 64], [-20, 150, 256]]
+    resolution = [[-5, 50, 16], [-20, 80, 64], [-20, 100, 256]]
+    #resolution = [[80, 120, 16],]
+
     GRB_data = get_files(folder, pattern='_FER.txt', switch=1)
 
     if GRB_data == None:
@@ -360,7 +363,7 @@ def get_coordinates(folder, file):
 
 if __name__ == "__main__":
 
-    folder_path = '../GRB20180210_T44678'
+    folder_path = '../GRB20180427_T38223'
 
     first_tte_file = get_files(folder_path, pattern='glg_tte_n')
 
