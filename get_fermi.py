@@ -50,10 +50,13 @@ def nlst(ftp, str_pattern):
 
 def download(ftp, path, file_ftp, str_pattern):
 
-    file_folder = list(filter(lambda x: x.startswith(str_pattern), path))
+    path_folder = os.listdir(path)
+    file_folder = list(filter(lambda x: x.startswith(str_pattern), path_folder))
+    #print path, file_folder
+    #print file_ftp
     if file_ftp != file_folder:
         for file_ftp in sorted(set(file_ftp) - set(file_folder)):
-            log.info ("Downloading {:s}".format(file_ftp))
+            log.info("Downloading {:s}".format(file_ftp))
             ftp.retrbinary('RETR ' + file_ftp, open(path+'/'+file_ftp,'wb').write)
     else:
         log.info ("No new files in format -> {:s}".format(str_pattern))
@@ -64,10 +67,13 @@ def all_files_are_downloaded(path):
     path_folder = os.listdir(path)
     file_folder = list(filter(lambda x: x.startswith('glg_tte_n'), path_folder))
     file_tcat = list(filter(lambda x: x.startswith('glg_tcat_all'), path_folder))
+    file_loc = list(filter(lambda x: x.startswith('glg_loclist_all'), path_folder))
 
-    print(file_folder, file_tcat)
+    #print("TTE: ", file_folder)
+    #print("t_cat: ", file_tcat)
+    #print("loclist: ", file_loc)
     
-    if (len(file_folder) >= 12 and len(file_tcat) >= 1):
+    if (len(file_folder) >= 12 and len(file_tcat) >= 1): # and len(file_loc)>=1):
         check = True
     return check
 
@@ -75,7 +81,7 @@ def download_fermi(name, path):
     #print(name, path)
     ftp_dir = "fermi/data/gbm/triggers/20{:s}/bn{:s}/current".format(name[0:2], name)
     k = 0
-    k_max = 30
+    k_max = 40
 
     while not all_files_are_downloaded(path):
         k += 1
@@ -97,7 +103,7 @@ def download_fermi(name, path):
             loclist_all_ftp = nlst(ftp, 'glg_loclist_all*txt')
             tte_n_ftp = nlst(ftp, 'glg_tte_n*fit')
             glg_tcat_all_ftp = nlst(ftp, 'glg_tcat_all*fit')
-
+           
             download(ftp, path, lc_tot_ftp, 'glg_lc_tot')
             download(ftp, path, trigdat_all_ftp, 'glg_trigdat_all')
             download(ftp, path, loclist_all_ftp, 'glg_loclist_all')
@@ -125,8 +131,8 @@ def download_fermi(name, path):
 
 if __name__ == '__main__':
 
-    event_gbm_name = '180305393'
-    path = '../GRB20180305_T33968'
+    event_gbm_name = '180925407'
+    path = '../GRB20180925_T35190'
 
     download_fermi(event_gbm_name, path)
     #eph(('glg_trigdat_all_bn180227211_v01.fit',''), path)
