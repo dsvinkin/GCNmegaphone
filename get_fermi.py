@@ -127,12 +127,13 @@ def download_fermi(name, path):
         file_tcat = list(filter(lambda x: x.startswith('glg_tcat_all'), path_folder))
 
         eph(file_tcat, path)
+        print file_folder
         gbm_tte.tte_to_ascii(path, file_folder[0])
 
 if __name__ == '__main__':
 
-    event_gbm_name = '180925407'
-    path = '../GRB20180925_T35190'
+    event_gbm_name = '181102983'
+    path = '../GRB20181102_T84955'
 
     download_fermi(event_gbm_name, path)
     #eph(('glg_trigdat_all_bn180227211_v01.fit',''), path)

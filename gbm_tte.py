@@ -242,6 +242,21 @@ def temporal_history(folder, file, detectors, resolution, bounds):
 
         print_data(folder, file, bins, mas, bounds, str(resolution[r][2]))
 
+def get_RA_Dec(folder, file_name):
+
+    RA = None
+    Dec = None
+    with open(folder+file_name, 'r') as inp:
+        text = inp.read()
+        m = re.search(r'RA_OBJ\s*=\s*(\d+\.\d+)', text)
+        if m:
+            RA = float(m.group(1))
+
+        m = re.search(r'DEC_OBJ\s*=\s*([+-]?\d+\.\d+)', text)
+        if m:
+            Dec = float(m.group(1))
+
+    return RA, Dec
 
 # Reading of detectors
 def get_detectors(folder, file_name):
@@ -282,18 +297,26 @@ def tte_to_ascii(folder, file):
 
     file_detectors = get_files(folder)
     detectors = get_detectors(folder, file_detectors)
-    #resolution = [[-1, 1, 2], [-5, 50, 16], [-10, 100, 64], [-20, 150, 256]]
-    resolution = [[-5, 50, 16], [-20, 80, 64], [-20, 100, 256]]
-    #resolution = [[80, 120, 16],]
+    resolution = [[-1, 1, 2], [-5, 50, 16], [-10, 100, 64], [-20, 150, 256]]
+    #resolution = [[-10, 60, 16], [-20, 80, 64], [-20, 100, 256]]
+    #resolution = [[-1, 1, 2],]
 
     GRB_data = get_files(folder, pattern='_FER.txt', switch=1)
+    trig_dat = get_files(folder, pattern='glg_trigdat_all_bn', switch=0)
 
-    if GRB_data == None:
+    str_src = ''
+    if GRB_data is None and trig_dat is None:
         RA = data_input('RA')
         Dec = data_input('Dec')
-    else:
+        str_src = 'User'
+    elif GRB_data is not None:
         RA, Dec = get_coordinates(folder, GRB_data)
+        str_src = GRB_data
+    elif trig_dat is not None:
+        RA, Dec = get_RA_Dec(folder, trig_dat)
+        str_src = trig_dat
 
+    print("RA, Dec from {:s}: {:8.3f} {:8.3f}".format(str_src, RA, Dec))
     RA, Dec = equat2eclipt(RA, Dec)
 
     if Dec >= 0:
@@ -318,11 +341,12 @@ def get_files(path, pattern='glg_trigdat_all', switch = 0):
     else:
         file_folder = list(filter(lambda x: x.startswith(pattern), list_files))
 
-    try:
+    if len(file_folder) != 0:
+        print(file_folder)
         return file_folder[0]
-    except IndexError:
-        print("No required file!")
-        exit(0)
+    else:
+        print("No required file with pattern: {:s}".format(pattern))
+        return None
 
 def data_input(x):
 
@@ -363,7 +387,7 @@ def get_coordinates(folder, file):
 
 if __name__ == "__main__":
 
-    folder_path = '../GRB20180427_T38223'
+    folder_path = '../GRB20181111_T56534'
 
     first_tte_file = get_files(folder_path, pattern='glg_tte_n')
 

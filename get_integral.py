@@ -47,7 +47,7 @@ def download_integral(date, time, interval, path):
     time_hhmmss = GetInHMS(time, use_codes=False)
     Name_event = "GRB{:s}_T{:05d}".format(date,time)
 
-    proxy = {'http': 'http://www-proxy:3128'}
+    proxy = {'http': 'http://www-proxy.ioffe.ru:3128'}
 
     k = 0
     k_max = 30
