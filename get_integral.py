@@ -7,7 +7,8 @@ import os
 from time import sleep
 
 timeout = 30 # s
-data_download_delay = 2400 # s
+data_download_delay = 1200 # s
+max_number_of_requests = 60
  
 log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u'log.txt')
 
@@ -34,6 +35,19 @@ def thr_is_ok(file_name):
     else:
         return False
 
+def request_data(data):
+
+    url_lc =  'http://isdc.unige.ch/~savchenk/spiacs-online/spiacs.pl'
+    proxy = {'http': 'http://www-proxy.ioffe.ru:3128'}
+
+    try: 
+        req = requests.post(url_lc, data=data, proxies=proxy)
+    except requests.exceptions.RequestException as e:
+        log.info("Got error {:s} for {:s}.".format(str(e), data['requeststring']))
+        return None
+    else:
+        return req.text
+
 def download_integral(date, time, interval, path):
     """
     date - YYYYMMDD [str] 
@@ -41,29 +55,30 @@ def download_integral(date, time, interval, path):
     interval - integer seconds [int]
     """
 
-    url_lc =  'http://isdc.unige.ch/~savchenk/spiacs-online/spiacs.pl'
+    
     m = re.search('(\d{4})(\d{2})(\d{2})', date)
     date_dashed = "{:s}-{:s}-{:s}".format(m.group(1), m.group(2), m.group(3))
     time_hhmmss = GetInHMS(time, use_codes=False)
     Name_event = "GRB{:s}_T{:05d}".format(date,time)
 
-    proxy = {'http': 'http://www-proxy.ioffe.ru:3128'}
-
     k = 0
-    k_max = 30
 
     thr_file = "{:s}_{:05d}_INT.thr".format(date, time)
     eph_file = "{:s}_{:05d}_INT.eph".format(date, time)
 
-    while (not thr_is_ok(path+'/'+thr_file) and k <= k_max):
+    while (not thr_is_ok(path+'/'+thr_file) and k <= max_number_of_requests):
         k += 1
         # get lc
         #print ('get lc')
         utc = "{:s}T{:s} {:d}".format(date_dashed, time_hhmmss, int(interval))
-        log.info (utc)
+        log.info("Geting SPI-ACS data for {:s}".format(utc))
         data = {'requeststring': utc, 'submit':'Submit', 'generate':'ipnlc'}
-        req = requests.post(url_lc, data=data, proxies=proxy)
-        text = re.sub("<br>","", req.text)
+        
+        text = request_data(data)
+        if not text:
+            continue
+        
+        text = re.sub("<br>","", text)
         text = re.sub("\r","", text)
 
         with open(path+'/'+thr_file, 'w') as f:
@@ -73,8 +88,12 @@ def download_integral(date, time, interval, path):
         # get eph
         utc = "{:s}T{:s}".format(date_dashed, time_hhmmss, int(interval))
         data = {'requeststring': utc, 'submit':'Submit', 'generate':'ephs'}
-        req = requests.post(url_lc, data=data, proxies=proxy)
-        text = re.sub("<br>","", req.text)
+        
+        text = request_data(data)
+        if not text:
+            continue
+        
+        text = re.sub("<br>","", text)
         text = re.sub("\r","", text)
 
         with open(path+'/'+eph_file, 'w') as f:

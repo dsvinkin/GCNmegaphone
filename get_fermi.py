@@ -16,9 +16,9 @@ data_download_delay = 1200 # s
 
 log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u'log.txt')
 
-def eph(list_tcat, path):
+def eph(list_trigdat, path):
 
-    with open(path+'/'+list_tcat[0], 'r') as in_file,\
+    with open(path+'/'+list_trigdat[0], 'r') as in_file,\
         open(path+'/'+'fermi_date_time.txt','w') as out_file:
         text = in_file.read()
         trigtime = re.findall(r'\d{9}.\d{6}', text)
@@ -42,10 +42,7 @@ def eph(list_tcat, path):
 def nlst(ftp, str_pattern):
 
     files = []
-    try:
-        files = sorted(ftp.nlst(str_pattern))
-    except ftplib.error_temp:
-        log.info("No {:s} files in directory".format(str_pattern))
+    files = sorted(ftp.nlst(str_pattern))
     return files
 
 def download(ftp, path, file_ftp, str_pattern):
@@ -66,14 +63,14 @@ def all_files_are_downloaded(path):
     check = False
     path_folder = os.listdir(path)
     file_folder = list(filter(lambda x: x.startswith('glg_tte_n'), path_folder))
-    file_tcat = list(filter(lambda x: x.startswith('glg_tcat_all'), path_folder))
+    file_trigdat = list(filter(lambda x: x.startswith('glg_trigdat_all'), path_folder))
     file_loc = list(filter(lambda x: x.startswith('glg_loclist_all'), path_folder))
 
-    #print("TTE: ", file_folder)
-    #print("t_cat: ", file_tcat)
-    #print("loclist: ", file_loc)
+    print("TTE: ", file_folder)
+    print("trigdat: ", file_trigdat)
+    print("loclist: ", file_loc)
     
-    if (len(file_folder) >= 12 and len(file_tcat) >= 1): # and len(file_loc)>=1):
+    if (len(file_folder) >= 12 and len(file_trigdat) >= 1): # and len(file_loc)>=1):
         check = True
     return check
 
@@ -89,12 +86,13 @@ def download_fermi(name, path):
             log.info("Failed to download data from the folder bn{:s}".format(name))
             break
 
-        log.info ("Connecting ...")
-        ftp = FTP('legacy.gsfc.nasa.gov')
-        ftp.login()
-        log.info ("Connected")
+        log.info ("Connecting to legacy.gsfc.nasa.gov ...")
 
         try:
+            ftp = FTP('legacy.gsfc.nasa.gov')
+            ftp.login()
+            log.info("Connected")
+
             ftp.cwd(ftp_dir)
             log.info("Path of the ftp directory {:s}".format(ftp_dir))
       
@@ -114,8 +112,11 @@ def download_fermi(name, path):
             log.info("Disconnect")
 
         except ftplib.error_perm as e:
-            log.info("Got error {:s}. Maybe the folder bn{:s} is not created! Wait ...".format(str(e), name))
+            log.error("Got error {:s}. Maybe the folder bn{:s} is not created! Wait ...".format(str(e), name))
             ftp.quit()
+
+        except Exception as e:
+            log.error("Got error {:s} during GBM data downloading.".format(str(e), name))
 
         if k > 1:
             sleep(data_download_delay)
@@ -124,16 +125,16 @@ def download_fermi(name, path):
         log.info ("The thread bn{:s} finale!".format(name))
         path_folder = os.listdir(path)
         file_folder = list(filter(lambda x: x.startswith('glg_tte_n'), path_folder))
-        file_tcat = list(filter(lambda x: x.startswith('glg_tcat_all'), path_folder))
+        file_trigdat = list(filter(lambda x: x.startswith('glg_trigdat'), path_folder))
 
-        eph(file_tcat, path)
+        eph(file_trigdat, path)
         print file_folder
         gbm_tte.tte_to_ascii(path, file_folder[0])
 
 if __name__ == '__main__':
 
-    event_gbm_name = '181102983'
-    path = '../GRB20181102_T84955'
+    event_gbm_name = '181208188'
+    path = '../GRB20181208_T16244'
 
     download_fermi(event_gbm_name, path)
     #eph(('glg_trigdat_all_bn180227211_v01.fit',''), path)
