@@ -33,6 +33,7 @@ bot = telebot.TeleBot(token)
 current_event_fermi = None
 current_event_integral = None
 
+# See https://gcn.gsfc.nasa.gov/filtering.html
 ArrayType = {
     '31': 'IPN RAW', 
     '111': 'FERMI GBM FLT POS',
@@ -40,7 +41,11 @@ ArrayType = {
     '115': 'FERMI GBM FIN POS',
     '61': 'SWIFT BAT GRB POS ACK', 
     '84': 'SWIFT BAT TRANS',
-    '52': 'INTEGRAL SPIACS'
+    '52': 'INTEGRAL SPIACS',
+    '150': 'LVC_PRELIM',
+    '151': 'LVC_INITIAL',
+    '152': 'LVC_UPDATE',
+    '154': 'LVC_CNTRPART',
      }
 
 ArrayParam = {
@@ -64,8 +69,11 @@ ArrayParam = {
     'C1':'GRB_RA',
     'C2':'GRB_DEC',
     'Error2Radius': 'GRB_ERROR',
-    'ISOTime':'GRB_TIME'
+    'ISOTime':'GRB_TIME',
     }
+
+# See https://gcn.gsfc.nasa.gov/sock_pkt_def_doc.html
+# for most_likely and 2most_likely definitions 
 
 # Most_Likely_Ind
 GoodIndex = {
@@ -100,7 +108,6 @@ AllIndex = {
     '18': '18 undefined', 
     '19': '19 TGF'
     }
-
 
 def get_event_name(str_date_time):
 
@@ -151,7 +158,8 @@ class notice:
         tree = etree.XML(payload) 
 
         self.dict_par = OrderedDict()
-        self._update_dict(tree, self.dict_par)
+        #self._update_dict(tree, self.dict_par) 
+        self._update_dict_lxml(tree, self.dict_par)
         #print (self.dict_par)
 
         self.role = tree.attrib['role']
@@ -173,7 +181,7 @@ class notice:
                 self._update_dict(subelement, my_dict)
     
         else:  # Otherwise, subtree is a leaf.
-            #print (element.tag,':', element.text, element.attrib)
+            print (element.tag,':', element.text, element.attrib)
     
             if element.text:
                 name = element.tag
@@ -184,8 +192,26 @@ class notice:
                 name = element.attrib.get('name',None)
                 val = element.attrib.get('value',None)
                 if name and val:
-                    #print (name,':', val)
+                    print (name,':', val)
                     my_dict[name] = val
+
+    def _update_dict_lxml(self, root, my_dict):
+
+        lst_par = root.findall('.//Param')
+        for param in lst_par:
+            name = param.attrib.get('name', None)
+            value = param.attrib.get('value', None)
+            if name and value:
+                #print (name,':', val)
+                my_dict[name] = value
+
+        # Get text parameters
+        lst_gbm_par_names = ['ISOTime', 'C1', 'C2', 'Error2Radius']
+        for name in lst_gbm_par_names:
+            lst_par = root.findall('.//{:s}'.format(name))
+            if len(lst_par):
+                my_dict[name] = lst_par[0].text
+            
 
     def get_value(self, key):
         return self.dict_par.get(key, None)
@@ -235,9 +261,10 @@ class notice:
 def send_to_telegram(data, notice_type, event_date_time, event_name):
 
     lst_par = qw('Trig_Timescale Data_Timescale Data_Integ Data_Signif Burst_Signif Sun_Distance MOON_Distance Galactic_Lat')
+    lst_par_lvc = qw('Instruments FAR BNS NSBH BBH Terrestrial HasNS HasRemnant')
 
     text= "Recieved notice: {:s}\nTrig. time: {:s}\nBurst name: {:s}\n".format(notice_type, event_date_time, event_name)
-    for s in lst_par:
+    for s in lst_par + lst_par_lvc:
         val = data.get_value(s)
         if val:
             text += "{:16s} {:s}\n".format(s+':', val)
@@ -253,7 +280,11 @@ def send_to_telegram(data, notice_type, event_date_time, event_name):
     gcn.notice_types.FERMI_GBM_FLT_POS,
     gcn.notice_types.FERMI_GBM_GND_POS,
     gcn.notice_types.FERMI_GBM_FIN_POS,
-    gcn.notice_types.INTEGRAL_SPIACS)
+    gcn.notice_types.INTEGRAL_SPIACS,
+    gcn.notice_types.LVC_PRELIMINARY,
+    gcn.notice_types.LVC_INITIAL,
+    gcn.notice_types.LVC_UPDATE
+    )
 
 def process_gcn(payload, root):
 
@@ -262,10 +293,12 @@ def process_gcn(payload, root):
 
     # Respond to only real 'observation' events
     if (data.role != 'observation'):
-        #print ("data.role != observation")
+        print ("data.role != observation")
         return
   
     notice_type = ArrayType.get(data.get_value('Packet_Type'), None)
+    print(data.get_value('Packet_Type')) 
+
     if not notice_type:
         return
 
@@ -299,9 +332,9 @@ def process_gcn(payload, root):
         run_download_gbm_thread(event_name, event_gbm_name, path)
         run_download_int_thread(event_name, event_date, int(event_time), path)
 
-    elif notice_type == 'INTEGRAL SPIACS' or notice_type == 'IPN RAW':
+    elif notice_type in ('INTEGRAL SPIACS', 'IPN RAW', 'LVC_PRELIM'):
         run_download_int_thread(event_name, event_date, int(event_time), path)
-        
+
 
 if __name__ == "__main__":
     # Listen for GCNs until the program is interrupted (killed or interrupted with control-C).

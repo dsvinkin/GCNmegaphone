@@ -2,10 +2,15 @@
 """ 
 Test for notice_filter.py
 """
+
+from __future__ import print_function
+
+from lxml.etree import fromstring
+
 import gcn
 import notice_filter
 
-payload = '''\
+payload_gbm = '''\
 <?xml version = '1.0' encoding = 'UTF-8'?>
 <voe:VOEvent
       ivorn="ivo://nasa.gsfc.gcn/Fermi#GBM_Flt_Pos_2018-02-25T10:00:54.18_541245659_44-006"
@@ -123,9 +128,281 @@ payload = '''\
 </voe:VOEvent>
 '''
 
-date_time = '2018-02-10T12:24:38.55' 
-payload = payload.format(date_time)
-payload = payload.encode('UTF-8')
+payload_lvc = """\
+<?xml version="1.0" ?>
+<voe:VOEvent xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xmlns:voe="http://www.ivoa.net/xml/VOEvent/v2.0"
+xsi:schemaLocation="http://www.ivoa.net/xml/VOEvent/v2.0 http://www.ivoa.net/xml/VOEvent/VOEvent-v2.0.xsd"
+ version="2.0" role="observation" ivorn="ivo://gwnet/LVC#MS190225l-1-Preliminary">
+    <Who>
+        <Date>2019-02-25T11:59:29</Date>
+        <Author>
+            <contactName>LIGO Scientific Collaboration and Virgo Collaboration</contactName>
+        </Author>
+    </Who>
+    <What>
+        <Param name="Packet_Type" dataType="int" value="150">
+            <Description>The Notice Type number is assigned/used within GCN, eg type=150 is an LVC_PRELIMINARY notice</Description>
+        </Param>
+        <Param name="internal" dataType="int" value="0">
+            <Description>Indicates whether this event should be distributed to LSC/Virgo members only</Description>
+        </Param>
+        <Param name="Pkt_Ser_Num" dataType="string" value="1"/>
+        <Param name="GraceID" dataType="string" value="MS190225l" ucd="meta.id">
+            <Description>Identifier in GraceDB</Description>
+        </Param>
+        <Param name="AlertType" dataType="string" value="Preliminary" ucd="meta.version">
+            <Description>VOEvent alert type</Description>
+        </Param>
+        <Param name="HardwareInj" dataType="int" value="0" ucd="meta.number">
+            <Description>Indicates that this event is a hardware injection if 1, no if 0</Description>
+        </Param>
+        <Param name="OpenAlert" dataType="int" value="1" ucd="meta.number">
+            <Description>Indicates that this event is an open alert if 1, no if 0</Description>
+        </Param>
+        <Param name="EventPage" dataType="string" value="https://gracedb.ligo.org/superevents/MS190225l/view/" ucd="meta.ref.url">
+            <Description>Web page for evolving status of this GW candidate</Description>
+        </Param>
+        <Param name="Instruments" dataType="string" value="H1,L1,V1" ucd="meta.code">
+            <Description>List of instruments used in analysis to identify this event</Description>
+        </Param>
+        <Param name="FAR" dataType="float" value="5.17695487734e-16" ucd="arith.rate;stat.falsealarm" unit="Hz">
+            <Description>False alarm rate for GW candidates with this strength or greater</Description>
+        </Param>
+        <Param name="Group" dataType="string" value="CBC" ucd="meta.code">
+            <Description>Data analysis working group</Description>
+        </Param>
+        <Param name="Pipeline" dataType="string" value="gstlal" ucd="meta.code">
+            <Description>Low-latency data analysis pipeline</Description>
+        </Param>
+        <Param name="Search" dataType="string" value="MDC" ucd="meta.code">
+            <Description>Specific low-latency search</Description>
+        </Param>
+        <Group type="GW_SKYMAP" name="bayestar">
+            <Param name="skymap_fits" dataType="string" value="https://gracedb.ligo.org/api/superevents/MS190225l/files/bayestar.fits.gz" ucd="meta.ref.url">
+                <Description>Sky Map FITS</Description>
+            </Param>
+        </Group>
+        <Group type="Classification">
+            <Param name="BNS" dataType="float" value="0.99991250894" ucd="stat.probability">
+                <Description>Probability that the source is a binary neutron star merger</Description>
+            </Param>
+            <Param name="NSBH" dataType="float" value="0.0" ucd="stat.probability">
+                <Description>Probability that the source is a neutron star - black hole merger</Description>
+            </Param>
+            <Param name="BBH" dataType="float" value="0.0" ucd="stat.probability">
+                <Description>Probability that the source is a binary black hole merger</Description>
+            </Param>
+            <Param name="Terrestrial" dataType="float" value="8.74910603082e-05" ucd="stat.probability">
+                <Description>Probability that the source is terrestrial (i.e., a background noise fluctuation or a glitch)</Description>
+            </Param>
+            <Description>Source classification: binary neutron star (BNS), neutron star-blackhole (NSBH), binary black hole (BBH), or terrestrial (noise)</Description>
+        </Group>
+        <Group type="Properties">
+            <Param name="HasNS" dataType="float" value="1.0" ucd="stat.probability">
+                <Description>Probability that at least one object in the binary has a mass that is less than 3 solar masses</Description>
+            </Param>
+            <Param name="HasRemnant" dataType="float" value="1.0" ucd="stat.probability">
+                <Description>Probability that a nonzero mass was ejected outside the central remnant object</Description>
+            </Param>
+            <Description>Qualitative properties of the source, conditioned on the assumption that the signal is an astrophysical compact binary merger</Description>
+        </Group>
+    </What>
+    <WhereWhen>
+        <ObsDataLocation>
+            <ObservatoryLocation id="LIGO Virgo"/>
+            <ObservationLocation>
+                <AstroCoordSystem id="UTC-FK5-GEO"/>
+                <AstroCoords coord_system_id="UTC-FK5-GEO">
+                    <Time>
+                        <TimeInstant>
+                            <ISOTime>2019-02-25T11:52:17.151336</ISOTime>
+                        </TimeInstant>
+                    </Time>
+                </AstroCoords>
+            </ObservationLocation>
+        </ObsDataLocation>
+    </WhereWhen>
+    <How>
+        <Description>Candidate gravitational wave event identified by low-latency analysis</Description>
+        <Description>H1: LIGO Hanford 4 km gravitational wave detector</Description>
+        <Description>L1: LIGO Livingston 4 km gravitational wave detector</Description>
+        <Description>V1: Virgo 3 km gravitational wave detector</Description>
+    </How>
+    <Description>Report of a candidate gravitational wave event</Description>
+</voe:VOEvent>
+"""
 
-root = gcn.voeventclient.parse_from_string(payload)
-notice_filter.process_gcn(payload, root)
+payload_lvc_initial = """\
+<?xml version="1.0" ?>
+<voe:VOEvent xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xmlns:voe="http://www.ivoa.net/xml/VOEvent/v2.0"
+xsi:schemaLocation="http://www.ivoa.net/xml/VOEvent/v2.0 http://www.ivoa.net/xml/VOEvent/VOEvent-v2.0.xsd"
+ version="2.0" role="observation" ivorn="ivo://gwnet/LVC#MS190225m-2-Initial">
+    <Who>
+        <Date>2019-02-25T13:00:27</Date>
+        <Author>
+            <contactName>LIGO Scientific Collaboration and Virgo Collaboration</contactName>
+        </Author>
+    </Who>
+    <What>
+        <Param name="Packet_Type" dataType="int" value="151">
+            <Description>The Notice Type number is assigned/used within GCN, eg type=151 is an LVC_INITIAL notice</Description>
+        </Param>
+        <Param name="internal" dataType="int" value="0">
+            <Description>Indicates whether this event should be distributed to LSC/Virgo members only</Description>
+        </Param>
+        <Param name="Pkt_Ser_Num" dataType="string" value="2"/>
+        <Param name="GraceID" dataType="string" value="MS190225m" ucd="meta.id">
+            <Description>Identifier in GraceDB</Description>
+        </Param>
+        <Param name="AlertType" dataType="string" value="Initial" ucd="meta.version">
+            <Description>VOEvent alert type</Description>
+        </Param>
+        <Param name="HardwareInj" dataType="int" value="0" ucd="meta.number">
+            <Description>Indicates that this event is a hardware injection if 1, no if 0</Description>
+        </Param>
+        <Param name="OpenAlert" dataType="int" value="1" ucd="meta.number">
+            <Description>Indicates that this event is an open alert if 1, no if 0</Description>
+        </Param>
+        <Param name="EventPage" dataType="string" value="https://gracedb.ligo.org/superevents/MS190225m/view/" ucd="meta.ref.url">
+            <Description>Web page for evolving status of this GW candidate</Description>
+        </Param>
+        <Param name="Instruments" dataType="string" value="H1,L1" ucd="meta.code">
+            <Description>List of instruments used in analysis to identify this event</Description>
+        </Param>
+        <Param name="FAR" dataType="float" value="9.11069936486e-14" ucd="arith.rate;stat.falsealarm" unit="Hz">
+            <Description>False alarm rate for GW candidates with this strength or greater</Description>
+        </Param>
+        <Param name="Group" dataType="string" value="CBC" ucd="meta.code">
+            <Description>Data analysis working group</Description>
+        </Param>
+        <Param name="Pipeline" dataType="string" value="gstlal" ucd="meta.code">
+            <Description>Low-latency data analysis pipeline</Description>
+        </Param>
+        <Param name="Search" dataType="string" value="MDC" ucd="meta.code">
+            <Description>Specific low-latency search</Description>
+        </Param>
+        <Group type="GW_SKYMAP" name="bayestar">
+            <Param name="skymap_fits" dataType="string" value="https://gracedb.ligo.org/api/superevents/MS190225m/files/bayestar.fits.gz" ucd="meta.ref.url">
+                <Description>Sky Map FITS</Description>
+            </Param>
+        </Group>
+        <Group type="Classification">
+            <Param name="BNS" dataType="float" value="0.995705026421" ucd="stat.probability">
+                <Description>Probability that the source is a binary neutron star merger</Description>
+            </Param>
+            <Param name="NSBH" dataType="float" value="0.0" ucd="stat.probability">
+                <Description>Probability that the source is a neutron star - black hole merger</Description>
+            </Param>
+            <Param name="BBH" dataType="float" value="0.0" ucd="stat.probability">
+                <Description>Probability that the source is a binary black hole merger</Description>
+            </Param>
+            <Param name="Terrestrial" dataType="float" value="0.0042949735787" ucd="stat.probability">
+                <Description>Probability that the source is terrestrial (i.e., a background noise fluctuation or a glitch)</Description>
+            </Param>
+            <Description>Source classification: binary neutron star (BNS), neutron star-blackhole (NSBH), binary black hole (BBH), or terrestrial (noise)</Description>
+        </Group>
+        <Group type="Properties">
+            <Param name="HasNS" dataType="float" value="1.0" ucd="stat.probability">
+                <Description>Probability that at least one object in the binary has a mass that is less than 3 solar masses</Description>
+            </Param>
+            <Param name="HasRemnant" dataType="float" value="1.0" ucd="stat.probability">
+                <Description>Probability that a nonzero mass was ejected outside the central remnant object</Description>
+            </Param>
+            <Description>Qualitative properties of the source, conditioned on the assumption that the signal is an astrophysical compact binary merger</Description>
+        </Group>
+    </What>
+    <WhereWhen>
+        <ObsDataLocation>
+            <ObservatoryLocation id="LIGO Virgo"/>
+            <ObservationLocation>
+                <AstroCoordSystem id="UTC-FK5-GEO"/>
+                <AstroCoords coord_system_id="UTC-FK5-GEO">
+                    <Time>
+                        <TimeInstant>
+                            <ISOTime>2019-02-25T12:56:16.153666</ISOTime>
+                        </TimeInstant>
+                    </Time>
+                </AstroCoords>
+            </ObservationLocation>
+        </ObsDataLocation>
+    </WhereWhen>
+    <How>
+        <Description>Candidate gravitational wave event identified by low-latency analysis</Description>
+        <Description>H1: LIGO Hanford 4 km gravitational wave detector</Description>
+        <Description>L1: LIGO Livingston 4 km gravitational wave detector</Description>
+    </How>
+    <Citations>
+        <EventIVORN cite="supersedes">ivo://gwnet/LVC#MS190225m-1-Preliminary</EventIVORN>
+        <Description>Initial localization is now available</Description>
+    </Citations>
+    <Description>Report of a candidate gravitational wave event</Description>
+</voe:VOEvent>
+
+"""
+
+"""
+LVC parameters description
+
+Packet_Type: The Notice Type number is assigned/used within GCN, eg type=151 is an LVC_INITIAL notice
+internal: Indicates whether this event should be distributed to LSC/Virgo members only
+GraceID: Identifier in GraceDB
+AlertType: VOEvent alert type
+HardwareInj: Indicates that this event is a hardware injection if 1, no if 0
+OpenAlert: Indicates that this event is an open alert if 1, no if 0
+EventPage: Web page for evolving status of this GW candidate
+Instruments: List of instruments used in analysis to identify this event
+FAR: False alarm rate for GW candidates with this strength or greater
+Group: Data analysis working group
+Pipeline: Low-latency data analysis pipeline
+Search: Specific low-latency search
+skymap_fits: Sky Map FITS
+BNS: Probability that the source is a binary neutron star merger
+NSBH: Probability that the source is a neutron star - black hole merger
+BBH: Probability that the source is a binary black hole merger
+Terrestrial: Probability that the source is terrestrial (i.e., a background noise fluctuation or a glitch)
+HasNS: Probability that at least one object in the binary has a mass that is less than 3 solar masses
+HasRemnant: Probability that a nonzero mass was ejected outside the central remnant object
+
+"""
+
+def test_gbm():
+    date_time = '2018-02-10T12:24:38.55' 
+    payload = payload_gbm.format(date_time)
+    payload = payload.encode('UTF-8')
+    
+    root = fromstring(payload)
+    notice_filter.process_gcn(payload, root)
+
+def test_lvc():
+
+    payload = payload_lvc.encode('UTF-8')
+    root = fromstring(payload)
+    notice_filter.process_gcn(payload, root)
+
+def test_lvc_simple():
+
+    payload = payload_lvc_initial.encode('UTF-8')
+    #payload = payload_gbm.encode('UTF-8')
+    root = fromstring(payload)
+
+    # Get the IVORN, or unique VOEvent ID, and print it.
+    print(root.attrib['ivorn'])
+
+    # Print all of the event attributes.
+    lst_par = root.findall('.//Param')
+    for param in lst_par:
+        name = param.attrib['name']
+        value = param.attrib['value']
+        text = ''
+        if len(param):
+            text = param[0].text
+        #print('{} = {}'.format(name, value))
+        print('{:s}: {:s}'.format(name, text))
+
+    print (root.findall('.//ISOTime')[0].text)
+
+test_lvc_simple()
+#test_lvc()
+#test_gbm()

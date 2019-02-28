@@ -111,8 +111,8 @@ def download_integral(date, time, interval, path):
         log.info ("Failed to download SPI-ACS data for {:s}.".format(Name_event))
 
 def test():
-    date = '20171029'
-    time = 39512
+    date = '20181222'
+    time = 68000
     interval = 200
     path = '.'
 

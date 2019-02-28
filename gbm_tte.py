@@ -297,9 +297,9 @@ def tte_to_ascii(folder, file):
 
     file_detectors = get_files(folder)
     detectors = get_detectors(folder, file_detectors)
-    resolution = [[-1, 1, 2], [-5, 50, 16], [-10, 100, 64], [-20, 150, 256]]
+    resolution = [[-1, 2, 2], [-5, 50, 16], [-10, 100, 64], [-20, 150, 256]]
     #resolution = [[-10, 60, 16], [-20, 80, 64], [-20, 100, 256]]
-    #resolution = [[-0.256, 0.512, 64],]
+    #resolution = [[-1, 2, 2],]
 
     GRB_data = get_files(folder, pattern='_FER.txt', switch=1)
     trig_dat = get_files(folder, pattern='glg_trigdat_all_bn', switch=0)
@@ -323,7 +323,6 @@ def tte_to_ascii(folder, file):
         bounds = [[15, 42], [43, 85], [86, 126]]
     else:
         bounds = [[16, 45], [46, 91], [92, 126]]
-        #bounds = [[16, 45], [46, 91], [0, 127]]
 
     temporal_history(folder, file, detectors, resolution, bounds)
 
@@ -388,7 +387,7 @@ def get_coordinates(folder, file):
 
 if __name__ == "__main__":
 
-    folder_path = '../GRB20181216_T47591'
+    folder_path = '../GRB20190226_T44505'
 
     first_tte_file = get_files(folder_path, pattern='glg_tte_n')
 

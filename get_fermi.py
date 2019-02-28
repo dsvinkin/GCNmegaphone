@@ -13,6 +13,7 @@ import tle
 import gbm_tte
 
 data_download_delay = 1200 # s 
+number_of_tte_min = 6
 
 log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u'log.txt')
 
@@ -42,7 +43,10 @@ def eph(list_trigdat, path):
 def nlst(ftp, str_pattern):
 
     files = []
-    files = sorted(ftp.nlst(str_pattern))
+    try:
+        files = sorted(ftp.nlst(str_pattern))
+    except Exception as e:
+        log.error("Got error in nlst: {:s} for {:s}.".format(str(e), str_pattern))
     return files
 
 def download(ftp, path, file_ftp, str_pattern):
@@ -70,13 +74,14 @@ def all_files_are_downloaded(path):
     print("trigdat: ", file_trigdat)
     print("loclist: ", file_loc)
     
-    if (len(file_folder) >= 12 and len(file_trigdat) >= 1): # and len(file_loc)>=1):
+    if (len(file_folder) >= number_of_tte_min and len(file_trigdat) >= 1): # and len(file_loc)>=1):
         check = True
     return check
 
 def download_fermi(name, path):
-    #print(name, path)
+
     ftp_dir = "fermi/data/gbm/triggers/20{:s}/bn{:s}/current".format(name[0:2], name)
+    
     k = 0
     k_max = 40
 
@@ -133,8 +138,8 @@ def download_fermi(name, path):
 
 if __name__ == '__main__':
 
-    event_gbm_name = '181208188'
-    path = '../GRB20181208_T16244'
+    event_gbm_name = '190222312'
+    path = '../GRB20190222_T26975'
 
     download_fermi(event_gbm_name, path)
-    #eph(('glg_trigdat_all_bn180227211_v01.fit',''), path)
+    #eph(('glg_trigdat_all_bn181222841_v00.fit',''), path)
