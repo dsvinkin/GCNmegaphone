@@ -9,26 +9,22 @@ import logging as log
 import re
 from collections import OrderedDict
 
-#import xml.dom.minidom
 from lxml import etree
 
 import gcn
 import gcn.handlers
 import gcn.notice_types
 
-import telebot
-
+import config
+import telegram_api
 import get_fermi
 import get_integral
 
-# Parameters of the log file
-#log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u'log.txt')
-log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.DEBUG, filename = u'log.txt')
+info = config.read_config('config.yaml')
 
-# Telegram parameters
-token = '408065188:AAGqxghhuzEBZUj-l17KNrBw7dAsbAOHLGE'
-chat_id = '@GCNnotices' #235646475
-bot = telebot.TeleBot(token)
+# Parameters of the log file
+log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.DEBUG, filename = u"{:s}/{:s}".format(info['log_dir'], 'log.txt'))
+
 
 current_event_fermi = None
 current_event_integral = None
@@ -109,6 +105,9 @@ AllIndex = {
     '19': '19 TGF'
     }
 
+def qw(s):
+    return s.split()
+
 def get_event_name(str_date_time):
 
     time = datetime.datetime.strptime(str_date_time, "%Y-%m-%dT%H:%M:%S.%f")
@@ -148,9 +147,6 @@ def run_download_int_thread(event_name, date, time, path):
     else:
         log.info ("The thread {:s} is already working".format(event_name+'_INT'))
 
-def qw(s):
-    return s.split()
-
 class notice:
 
     def __init__(self, payload):
@@ -165,9 +161,9 @@ class notice:
         self.role = tree.attrib['role']
 
     def append_payload_to_file(self, file_name):
-        with open(file_name, 'a') as f:
-          print("-------------------------------", file=f)
-          print(self.payload, file=f)
+        with open(file_name, 'ab') as f:
+          f.write("------------------------------\n".encode('UTF-8'))
+          f.write(self.payload)
 
     def _update_dict(self, element, my_dict):
         """
@@ -241,12 +237,11 @@ class notice:
     
     def append_info_to_file(self, file_name):
 
-       lst_to_print = qw('Packet_Type TrigID  ISOTime '+ 
-            'Trig_Timescale Data_Timescale Data_Signif '+
-            'Most_Likely_Index Most_Likely_Prob Sec_Most_Likely_Index Sec_Most_Likely_Prob '+
-            'C1 C2 Error2Radius '+
-            'Sun_Distance Galactic_Long Galactic_Lat Ecliptic_Long Ecliptic_Lat'
-             )
+       lst_to_print = qw("""Packet_Type TrigID  ISOTime  
+            Trig_Timescale Data_Timescale Data_Signif 
+            Most_Likely_Index Most_Likely_Prob Sec_Most_Likely_Index Sec_Most_Likely_Prob 
+            C1 C2 Error2Radius
+            Sun_Distance Galactic_Long Galactic_Lat Ecliptic_Long Ecliptic_Lat""")
 
        with open(file_name, 'a') as f:
           now = datetime.datetime.utcnow()
@@ -256,21 +251,6 @@ class notice:
               self.print_param(key, f)
       
           print("-----------------------------\n", file=f)
-
-
-def send_to_telegram(data, notice_type, event_date_time, event_name):
-
-    lst_par = qw('Trig_Timescale Data_Timescale Data_Integ Data_Signif Burst_Signif Sun_Distance MOON_Distance Galactic_Lat')
-    lst_par_lvc = qw('Instruments FAR BNS NSBH BBH Terrestrial HasNS HasRemnant')
-
-    text= "Recieved notice: {:s}\nTrig. time: {:s}\nBurst name: {:s}\n".format(notice_type, event_date_time, event_name)
-    for s in lst_par + lst_par_lvc:
-        val = data.get_value(s)
-        if val:
-            text += "{:16s} {:s}\n".format(s+':', val)
-
-    log.info(text)
-    bot.send_message(chat_id, text)
 
 
 # Function to call every time a GCN is received.
@@ -289,15 +269,15 @@ def send_to_telegram(data, notice_type, event_date_time, event_name):
 def process_gcn(payload, root):
 
     data = notice(payload)
-    data.append_payload_to_file('raw_notices.txt')
+    data.append_payload_to_file("{:s}/{:s}".format(info['log_dir'],'raw_notices.txt'))
 
     # Respond to only real 'observation' events
     if (data.role != 'observation'):
-        print ("data.role != observation")
+        #print ("data.role != observation")
         return
   
     notice_type = ArrayType.get(data.get_value('Packet_Type'), None)
-    print(data.get_value('Packet_Type')) 
+    print("Recieved Packet_Type: {:s} - {:s}".format(data.get_value('Packet_Type'), notice_type)) 
 
     if not notice_type:
         return
@@ -316,7 +296,7 @@ def process_gcn(payload, root):
     else:
         log.info ("MOST_LIKELY_IND is {:s} ({:s}), write event info to a file.".format(MOST_LIKELY_IND, AllIndex.get(MOST_LIKELY_IND, 'N/A')))
   
-    path = "../{:s}".format(event_name)
+    path = "{:s}/{:s}".format(info['data_dir'], event_name)
     if not os.path.exists(path):
         os.mkdir(path)
         log.info ("The folder {:s} is created".format(event_name))
@@ -326,7 +306,7 @@ def process_gcn(payload, root):
     data.append_info_to_file(file_name)
 
     #Send Telegram notification and download data
-    send_to_telegram(data, notice_type, event_date_time, event_name)
+    telegram_api.send_to_telegram(data, notice_type, event_date_time, event_name)
 
     if notice_type in ('FERMI GBM FLT POS', 'FERMI GBM GND POS', 'FERMI GBM FIN POS'):
         run_download_gbm_thread(event_name, event_gbm_name, path)

@@ -1,22 +1,107 @@
 # -*- coding: utf-8 -*-
 
-"""
-    GBMTTEFile class was implemented by M. Burgess
-    in https://github.com/giacomov/3ML
-"""
-
 from __future__ import print_function
 
-import astropy.io.fits as fits
 import logging as log
 import numpy as np
 import os
 import re
 
-log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u'log.txt')
+from astropy.io import fits
+
+import clock
+import config
+info = config.read_config('config.yaml')
+
+log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u"{:s}/{:s}".format(info['log_dir'], 'log.txt'))
+
+def get_files(path, pattern='', switch=0, all=False):
+    """
+    Find file with specific prefix (switch=1) or suffix (switch=0) 
+    """
+
+    list_files = os.listdir(path)
+
+    if len(list_files) == 0:
+        print("Directory {:s} is empty!".format(list_files))
+        return None
+
+    if switch != 0:
+        file_folder = list(filter(lambda x: x.endswith(pattern), list_files))
+    else:
+        file_folder = list(filter(lambda x: x.startswith(pattern), list_files))
+
+    if len(file_folder) == 0:
+        print("No required file with pattern: {:s}".format(pattern))
+        return None
+
+    print(file_folder)
+
+    if all:
+        return file_folder
+    else:
+        return file_folder[0]
+
+        
+
+def equat2eclipt(fRA, fDec):
+    """
+    Function converts equatorial coordinate to ecliptical.
+    fRA - Right ascension, deg
+    fDec - declination, deg
+    fL - ecliptic longitude, deg
+    fB - ecliptic latitude, deg
+
+    expression were taken from "Physics of Space, a little encyclopaedia" page 316
+    """
+
+    # inclination angle of the Earth spin axes to the ecliptic plane
+    eps = 23.43929 # degrees = 23o27' 23.43929
+
+    cosEps = np.cos(np.deg2rad(eps))
+    sinEps = np.sin(np.deg2rad(eps))
+
+    cosRA = np.cos(np.deg2rad(fRA))
+    sinRA = np.sin(np.deg2rad(fRA))
+    cosDec = np.cos(np.deg2rad(fDec))
+    sinDec = np.sin(np.deg2rad(fDec))
+
+    fL = np.rad2deg(np.arctan2(cosDec * sinRA * cosEps + sinDec * sinEps, cosDec * cosRA))
+    fB = np.rad2deg(np.arcsin(-cosDec * sinRA * sinEps + sinDec * cosEps))
+    
+    if (fL < 0):
+        fL += 360
+
+    return fL, fB
+
+
+def get_RA_Dec_from_log(path, file_name):
+
+    with open(os.path.join(path, file_name), 'r') as f:
+        lines = f.read().split('\n')
+
+    str_ = " ".join(lines)
+    lst_m = re.findall(r'GRB_RA\s*(\d+\.\d+)\s*GRB_DEC\s*([+-]?\d+\.\d+)', str_)
+    
+    if len(lst_m) == 0:
+        raise ValueError('No localization info is found in {:s}!'.format(file_name))
+
+    return float(lst_m[-1][0]), float(lst_m[-1][1])
+
+
+def get_RA_Dec(folder, file_name):
+
+    hdul = fits.open("{:s}/{:s}".format(folder, file_name))
+    RA = hdul[0].header['RA_OBJ']
+    Dec = hdul[0].header['DEC_OBJ']
+
+    return RA, Dec
 
 
 class GBMTTEFile(object):
+    """
+     GBMTTEFile class was adopted from threeML https://github.com/giacomov/3ML
+    """
 
     def __init__(self, ttefile):
         """
@@ -39,6 +124,8 @@ class GBMTTEFile(object):
             warnings.warn("There is no trigger time in the TTE file. Must be set manually or using MET relative times.")
 
             self._trigger_time = 0
+
+        self._src_name = tte['PRIMARY'].header['OBJECT']
 
         self._start_events = tte['PRIMARY'].header['TSTART']
         self._stop_events = tte['PRIMARY'].header['TSTOP']
@@ -133,262 +220,249 @@ class GBMTTEFile(object):
         # Normal dead time
         self._deadtime[~overflow_mask] = 2.E-6  # s
 
-
-def deg2rad(deg):
-     return deg*np.pi/180.0
-
-
-def rad2deg(rad):
-     return rad*180.0/np.pi
-
-
-def equat2eclipt(fRA, fDec):
-    """
-    Function converts equatorial coordinate to ecliptical.
-    fRA - Right ascension, deg
-    fDec - declination, deg
-    fL - ecliptic longitude, deg
-    fB - ecliptic latitude, deg
-
-    expression were taken from "Physics of Space, a little encyclopaedia" page 316
-    """
-
-    # inclination angle of the Earth spin axes to the ecliptic plane
-    eps = 23.43929 # degrees = 23o27' 23.43929
-
-    cosEps = np.cos(deg2rad(eps))
-    sinEps = np.sin(deg2rad(eps))
-
-    cosRA = np.cos(deg2rad(fRA))
-    sinRA = np.sin(deg2rad(fRA))
-    cosDec = np.cos(deg2rad(fDec))
-    sinDec = np.sin(deg2rad(fDec))
-
-    fL = rad2deg(np.arctan2(cosDec * sinRA * cosEps + sinDec * sinEps, cosDec * cosRA))
-    fB = rad2deg(np.arcsin(-cosDec * sinRA * sinEps + sinDec * cosEps))
+    def get_info(self, bounds):
+        """
+        Make header for ascii lc file
+        """
     
-    if (fL < 0):
-        fL += 360
+        date_utc = clock.fermi2utc(self._trigger_time)
+        frac_s = date_utc.microsecond/1e6
+        time2sec = date_utc.hour*3600 + date_utc.minute*60 + date_utc.second
+        sod = time2sec + frac_s
+        date = date_utc.strftime("%Y%m%d")
+    
+        str_info = "SrcName: {:s}\nT0 = {:.3f} MET\n".format(self._src_name, self._trigger_time)
+        str_info += "{:>11s}".format('Emin (keV):')
+        for i in range(len(bounds)):
+            str_info += "{:>6.1f}".format(self._emin[bounds[i][0]])
+    
+        str_info +="\n{:>11s}".format('Emax (keV):')
+        for i in range(len(bounds)):
+            str_info +="{:>6.1f}".format(self._emax[bounds[i][1]])
+    
+        return str_info, date, sod
 
-    return fL, fB
-
-
-# Create a temporary history file .thr
-def print_data(folder, file, bins, mas, bounds, resolution):
-
-    tte = GBMTTEFile(ttefile = folder+file)
-
-    with open(folder+'GRB'+file[13:19]+'_GBM_'+resolution+'ms.thr', 'w') as f:
-
-        print("SrcName: GRB{}".format(file[13:22]), file = f)
-        print("T0 = {:.3f} MET".format(tte.trigger_time), file = f)
-        print("{:>11} {:>6.1f} {:>6.1f} {:>6.1f}".format('Emin (keV):', tte.emin[bounds[0][0]],
-                                      tte.emin[bounds[1][0]], tte.emin[bounds[2][0]]), file = f)
-        print("{:>11} {:>6.1f} {:>6.1f} {:>6.1f}".format('Emax (keV):', tte.emax[bounds[0][1]],
-                                      tte.emax[bounds[1][1]], tte.emax[bounds[2][1]]), file = f)
-
-        for el in range(len(mas[0])):
-            print("{:<11.3f} {:>6} {:>6} {:>6}".format(bins[el], mas[0][el], mas[1][el], mas[2][el]), file = f)
-
-    print('File GRB'+file[13:19]+'_GBM_'+resolution+'ms.thr is created!')
-
-
-def tte_lightcurve(folder, file, start = -10, stop = 100, dt = 1, channel_start = 0, channel_end = 127):
-
-    tte = GBMTTEFile(ttefile = folder+file)
-    bins = np.arange(start, stop, step = dt)
-    arrival_times = []
-
-    for i in range(len(tte.energies)):
-
-        if channel_start <= tte.energies[i] <= channel_end:
-            arrival_times.append(tte.arrival_times[i] - tte.trigger_time)
-
-    counts, bins = np.histogram(np.array(arrival_times), bins = bins)
-    width = np.diff(bins)
-    time_bins = np.array(list(zip(bins[:-1], bins[1:])))
-
-    return counts, bins
+    def get_tte_lc(self, start=-10, stop=100, dt=1, channel_start=0, channel_end=127):
+        """
+        Get single channel lightcurve from TTE
+        """
+        
+        bins = np.arange(start, stop+1.5*dt, step=dt)
+        arrival_times = []
+        
+        for i in range(len(self._pha)):
+            if self._pha[i] >= channel_start and self._pha[i] <= channel_end:
+                arrival_times.append(self._events[i] - self._trigger_time)
+        
+        counts, bins = np.histogram(np.array(arrival_times), bins=bins)
+        time_bins = np.array(list(zip(bins[:-1], bins[1:])))
+        
+        return counts, bins[:-1]
 
 
-def temporal_history(folder, file, detectors, resolution, bounds):
+    def get_multichannel_lc(self, resolution, bounds):
+        """
+        Get multi-channel lightcurve.
+    
+        bounds - list of low and hi channel tuples
+        """
+    
+        lst_counts = []
+        lst_bins = [] # for consistency with counts
+        for b in range(len(bounds)):
+            counts, bins = self.get_tte_lc(start=resolution[0], stop=resolution[1], dt=resolution[2]/1000., 
+                     channel_start=bounds[b][0], channel_end=bounds[b][1])
+    
+            lst_counts.append(counts)
+            lst_bins.append(bins)
+    
+        return lst_bins[0], np.vstack(lst_counts)
 
-    for r in range(len(resolution)):
-        all_mas = []
 
-        for d in detectors:
-            current_file = file[0:9]+d+file[10:]
-            mas = []
+class light_curve:
 
-            for b in range(len(bounds)):
-                counts, bins = tte_lightcurve(folder, current_file, start = resolution[r][0], stop = resolution[r][1],
-                              dt = resolution[r][2]/1000., channel_start = bounds[b][0], channel_end = bounds[b][1])
+    def __init__(self):
+        self.lst_det = []
+        self.lst_res = []
+        self.dict_lc = {}
+        self.dict_info = {}
 
-                mas.append([0] * len(counts))
-                mas[b] = counts
+    def add_info(self, det, str_info):
+        self.dict_info[det] = str_info
 
-            all_mas.extend(mas)
+    def add_lc(self, det, res, bins, counts):
 
-        for el in range(len(all_mas[0])):
-            for l in range(3, len(all_mas), 3):
-                all_mas[0][el] += all_mas[l][el]
-                all_mas[1][el] += all_mas[l+1][el]
-                all_mas[2][el] += all_mas[l+2][el]
+        #print("Appending: ", det, res)
+        if (det, res) in self.dict_lc.keys():
+            print("Duplicate det and res: ", det, res)
 
-        mas = []
+        self.lst_det.append(det)
+        self.lst_res.append(res)
+        self.dict_lc[(det,res)] = (bins, counts)
 
-        for i in range(3):
-            mas.append(all_mas[i])
+    def get_sum_det_lc(self, res):
+        set_det = set(self.lst_det)
 
-        print_data(folder, file, bins, mas, bounds, str(resolution[r][2]))
+        bins = self.dict_lc[(self.lst_det[0], res)][0]
+        lc_size_res = len(bins)
+        n_bounds = len(self.dict_lc[(self.lst_det[0], res)][1])
+        lc_res = np.zeros((n_bounds, lc_size_res),dtype=int)
 
-def get_RA_Dec(folder, file_name):
+        for det in set_det:
+            #print(res, det)
+            #print(lc_res)
+            #print(self.dict_lc[(det, res)][1])
+            lc_res = lc_res + self.dict_lc[(det, res)][1]
 
-    RA = None
-    Dec = None
-    with open(folder+file_name, 'r') as inp:
-        text = inp.read()
-        m = re.search(r'RA_OBJ\s*=\s*(\d+\.\d+)', text)
-        if m:
-            RA = float(m.group(1))
+        return np.array(bins), lc_res, self.dict_info[self.lst_det[0]]
 
-        m = re.search(r'DEC_OBJ\s*=\s*([+-]?\d+\.\d+)', text)
-        if m:
-            Dec = float(m.group(1))
-
-    return RA, Dec
 
 # Reading of detectors
-def get_detectors(folder, file_name):
+def get_detectors(path, file_name):
 
     detectors = []
 
-    if os.path.exists(folder+'detectors.dat'): 
+    det_file = os.path.join(path,'detectors.dat')
+    fits_file = os.path.join(path, file_name)
 
-        with open(folder+'detectors.dat', 'r') as det:
+    if os.path.exists(det_file): 
+
+        with open(det_file, 'r') as det:
             text = det.read()
             text = ''.join(text.split())
             for s in text:
                 detectors.append(s)
 
     else:
-        with open(folder+file_name, 'r') as inp, open(folder+'detectors.dat', 'w') as out:
-            text = inp.read()
-            DET_MASK = re.findall(r'\d{14}', text)
-            DET_MASK = DET_MASK[1]
-            for el in range(len(DET_MASK) - 2):
-                if DET_MASK[el] != '0':
-                    if el == 10:
-                        detectors.append('a')
-                    elif el == 11:
-                        detectors.append('b')
-                    else:
-                        detectors.append(str(el))
+        hdul = fits.open(fits_file)
+        DET_MASK = hdul[0].header['DET_MASK']
 
+        for el in range(len(DET_MASK) - 2):
+            if DET_MASK[el] == '0':
+                continue
+
+            if el == 10:
+                detectors.append('a')
+            elif el == 11:
+                detectors.append('b')
+            else:
+                detectors.append(str(el))
+ 
+
+        with open(det_file, 'w') as out:        
             for el in detectors:
                 out.write(el+' ')
 
+    print("Detectors: ", detectors)
     return detectors
 
-def tte_to_ascii(folder, file):
+def get_resolution():
+    """
+    Make list of desired lightcurve resolutions (in ms) and start, end times (relative to the trigger time).
+    resolution = [[t_start_1, t_end_1, res_1],...]
+    """
 
-    if folder != '':
-        folder = folder + '/'
+    resolution = [[-2, 2, 2], [-5, 50, 16], [-10, 100, 64], [-20, 150, 256]]
+    #resolution = [[-2, 10, 2], [-5, 20, 16], [-10, 50, 64], [-20, 100, 256]]
+    #resolution = [[-50, 50, 64], [-50, 200, 256]]
+    #resolution += [[-1, 1, 1]]
 
-    file_detectors = get_files(folder)
-    detectors = get_detectors(folder, file_detectors)
-    resolution = [[-1, 2, 2], [-5, 50, 16], [-10, 100, 64], [-20, 150, 256]]
-    #resolution = [[-10, 60, 16], [-20, 80, 64], [-20, 100, 256]]
-    #resolution = [[-1, 2, 2],]
+    return resolution
 
-    GRB_data = get_files(folder, pattern='_FER.txt', switch=1)
-    trig_dat = get_files(folder, pattern='glg_trigdat_all_bn', switch=0)
-
-    str_src = ''
-    if GRB_data is None and trig_dat is None:
-        RA = data_input('RA')
-        Dec = data_input('Dec')
-        str_src = 'User'
-    elif GRB_data is not None:
-        RA, Dec = get_coordinates(folder, GRB_data)
-        str_src = GRB_data
-    elif trig_dat is not None:
-        RA, Dec = get_RA_Dec(folder, trig_dat)
-        str_src = trig_dat
-
-    print("RA, Dec from {:s}: {:8.3f} {:8.3f}".format(str_src, RA, Dec))
-    RA, Dec = equat2eclipt(RA, Dec)
+def get_channel_bounds(Dec):
+    """
+    Make three channel groups approximately corresponding Konus-Wind S1 and S2 channel bounderies.
+    """
 
     if Dec >= 0:
         bounds = [[15, 42], [43, 85], [86, 126]]
     else:
         bounds = [[16, 45], [46, 91], [92, 126]]
 
-    temporal_history(folder, file, detectors, resolution, bounds)
+    return bounds
 
 
-def get_files(path, pattern='glg_trigdat_all', switch = 0):
+def print_data(path, date, sod, res, bins, counts, str_info):
+    """
+    Create a lightcurve file
+    """
 
-    list_files = os.listdir(path)
+    #file_name = os.path.join(path, "gbm_tte_{:s}_{:05d}_{:d}ms.thr".format(date, int(sod), res))
+    file_name = os.path.join(path, "GRB{:s}_GBM_{:d}ms.thr".format(date[2:], res))
 
-    if not len(list_files):
-        print("Directory does not exist!")
-        exit(0)
+    with open(file_name, 'w') as f:
 
-    if switch != 0:
-        file_folder = list(filter(lambda x: x.endswith(pattern), list_files))
+        f.write("{:s}".format(str_info))
 
+        for i_time in range(len(bins)):
+            f.write("\n{:<11.3f}".format(bins[i_time]))
+            for i_ch in range(counts.shape[0]):
+                f.write(" {:>5d}".format(counts[i_ch,i_time]))
+
+    print('File {:s} has been created.'.format(file_name))
+
+def get_trigger_name(trig_dat):
+
+    m = re.search(r'(bn\d{9})', trig_dat)
+    return m.group(1)
+
+def get_tte_ver(lst_tte):
+
+    lst_ver = []
+    for s in lst_tte:
+        lst_ver.append(s[-6:-4])
+
+    ver = sorted(list(set(lst_ver)))[-1]
+    #print("TTE ver: ", ver)
+    return ver
+
+def tte_to_ascii(path):
+
+    trig_dat = get_files(path, pattern='glg_trigdat_all_bn', switch=0)
+    lst_tte = get_files(path, pattern='glg_tte_n', switch=0, all=True)
+    tte_ver = get_tte_ver(lst_tte)
+    trigger_name = get_trigger_name(trig_dat)
+    GRB_data = get_files(path, pattern='_FER.txt', switch=1)
+
+    detectors = get_detectors(path, trig_dat)
+    resolution = get_resolution()
+
+    if GRB_data is not None:
+        RA, Dec = get_RA_Dec_from_log(path, GRB_data)
+        str_src = GRB_data
+    elif trig_dat is not None:
+        RA, Dec = get_RA_Dec(path, trig_dat)
+        str_src = trig_dat
     else:
-        file_folder = list(filter(lambda x: x.startswith(pattern), list_files))
+        raise ValueError('No localization info is available!')
+        
 
-    if len(file_folder) != 0:
-        print(file_folder)
-        return file_folder[0]
-    else:
-        print("No required file with pattern: {:s}".format(pattern))
-        return None
+    print("RA, Dec  are from {:s}: {:8.3f} {:8.3f}".format(str_src, RA, Dec))
+    RA, Dec = equat2eclipt(RA, Dec)
 
-def data_input(x):
-
-    while True:
-
-        try:
-            text = "Enter values for " + x +': '
-            y = float(input(text))
-            return y
-
-        except ValueError:
-            print("The number is not correct, please repeat!")
+    e_bounds = get_channel_bounds(Dec)
 
 
-def get_coordinates(folder, file):
+    lc = light_curve()
+    for det in detectors:
+        tte_file = os.path.join(path, "glg_tte_n{:s}_{:s}_v{:s}.fit".format(det, trigger_name, tte_ver))
+        tte = GBMTTEFile(ttefile=tte_file)
 
-    with open(folder+file, 'r') as f:
+        str_info, date, sod = tte.get_info(e_bounds)
 
-        grb_ra = 'GRB_RA'
-        grb_dec = 'GRB_DEC'
-
-        try:
-            for line in f:
-                if grb_ra in line:
-                    RA = re.findall(r'\S\d+.\d+', line)[0]
-
-                elif grb_dec in line:
-                    Dec = re.findall(r'\S\d+.\d+', line)[0]
-
-            return float(RA), float(Dec)
-
-        except:
-            print('No data for RA and Dec in '+file+'!')
-            RA = data_input('RA')
-            Dec = data_input('Dec')
-            return RA, Dec
+        lc.add_info(det, str_info)
+        for res in resolution:
+            bins, counts = tte.get_multichannel_lc(res, e_bounds)
+            #print("Det, res: ", det, res[2])
+            lc.add_lc(det, res[2], bins, counts)
+    
+    for res in resolution:
+        bins, counts, str_info = lc.get_sum_det_lc(res[2])
+        print_data(path, date, sod, res[2], bins, counts, str_info)
 
 
 if __name__ == "__main__":
 
-    folder_path = '../GRB20190226_T44505'
+    path = 'GRB20180225_T36054'
 
-    first_tte_file = get_files(folder_path, pattern='glg_tte_n')
-
-    tte_to_ascii(folder_path, first_tte_file)
+    tte_to_ascii(path)

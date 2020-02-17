@@ -6,11 +6,15 @@ import re
 import os
 from time import sleep
 
+import config
+
+info = config.read_config('config.yaml')
+
 timeout = 30 # s
 data_download_delay = 1200 # s
 max_number_of_requests = 60
  
-log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u'log.txt')
+log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u"{:s}/{:s}".format(info['log_dir'], 'log.txt'))
 
 def GetInHMS(seconds, use_codes=False):
     hours = int(seconds / 3600)
@@ -38,7 +42,7 @@ def thr_is_ok(file_name):
 def request_data(data):
 
     url_lc =  'http://isdc.unige.ch/~savchenk/spiacs-online/spiacs.pl'
-    proxy = {'http': 'http://www-proxy.ioffe.ru:3128'}
+    proxy = {'http': info['http_proxy']}
 
     try: 
         req = requests.post(url_lc, data=data, proxies=proxy)

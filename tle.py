@@ -12,7 +12,6 @@ ISS(MAXI) 25544
 AGILE     31135
 RHESSI    27370
 
-c:\work\\Utilities\GetSCEphemeris\GetSCEphemeris4List.exe
 
 """
 
@@ -23,13 +22,14 @@ import subprocess
 import logging
 from datetime import datetime, timedelta
 
+import config
+info = config.read_config('config.yaml')
 
 def get_tle(str_date, sc_id):
 
     import requests
 
-    login = 'dmitrysvinkin@gmail.com'
-    password = 'MityaSpb1234567'
+    login, password = info['space-track']
 
     date_eph = datetime.strptime(str_date, "%Y%m%d").date()
     date_start = (date_eph - timedelta(days=2)).strftime("%Y-%m-%d")
@@ -60,7 +60,7 @@ def get_ephemeris(str_sc_name, str_date, str_time, path):
         'ISS':'25544', 
         'Tg-2':'41765',
         'AGILE':'31135',
-         'RHESSI':'27370'
+        'RHESSI':'27370'
     }
 
     if not str_sc_name in dic_sc:
@@ -82,11 +82,6 @@ def get_ephemeris(str_sc_name, str_date, str_time, path):
 
     with open(tle_file_name,'w') as f:
         f.write(text_tle)
-
-    #str_run = 'c:/work/Utilities/GetSCEphemeris/GetSCEphemeris4List.exe'
-    #str_run = "{:s} {:s} {:s} {:s}".format(str_run, tle_file_name, list_file_name, eph_file_name)
-    #logging.info(str_run)
-    #subprocess.call(str_run, shell=True)
 
     return list_file_name, tle_file_name, eph_file_name
 

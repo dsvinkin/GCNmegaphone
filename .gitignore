@@ -1,2 +1,5 @@
-*.pyc
-log.txt
+log/*
+test/*
+!test/*.py
+config.yaml
+Readme_ru.txt
