@@ -17,12 +17,12 @@ see [instruction][5] to create your own bot.
 log_dir:
     <path to store log and VOEvent dump, like "./logs" >
 data_dir:
-   <path to download data, like "./data" >
+    <path to download data, like "./data" >
 http_proxy:
-   <e.g., "http://www-proxy:1234">
+    <e.g., "http://www-proxy:1234">
 
 telegram_proxy:
-     <Telegram socks5h proxy>
+    <Telegram socks5h proxy>
 bot_token:
     <Telegram bot id>
 chat_id:
@@ -40,7 +40,7 @@ space-track: [login, passw]
 `clock.py` - different date and time conversion functions  
 `tle.py` - downloading TLE from space-track.org  
 
-test/test_notice_filter.py - testing script for notice_filter.py
+`test/test_notice_filter.py` - testing script for notice_filter.py
 
 ## Depends on
 
@@ -53,6 +53,10 @@ PySocks
 ## Useful links
 [VOEvents in GCN/TAN][6]  
 [Technical Details of GCN/TAN Notices][7]  
+
+## Acknowledgments
+
+Nikita Sulimin - intial development of the project during his M.Sc. project. 
 
 
 [1]: http://gcn.gsfc.nasa.gov
