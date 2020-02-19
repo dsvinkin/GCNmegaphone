@@ -31,6 +31,7 @@ lst_par_lvc = """\
  BNS 
  NSBH 
  BBH 
+ MassGap
  Terrestrial 
  HasNS 
  HasRemnant
