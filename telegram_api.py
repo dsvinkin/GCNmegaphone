@@ -6,7 +6,7 @@ import telegram
 import config
 info = config.read_config('config.yaml')
 
-log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.DEBUG, filename = u"{:s}/{:s}".format(info['log_dir'], 'log.txt'))
+log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u"{:s}/{:s}".format(info['log_dir'], 'log.txt'))
 
 # Telegram parameters
 chat_id = info['chat_id']
@@ -42,7 +42,7 @@ def send_to_telegram(data, notice_type, event_date_time, event_name):
 
     for s in lst_par + lst_par_lvc:
         val = data.get_value(s)
-        if val:
+        if val is not None:
             text += "{:16s} {:s}\n".format(s+':', val)
 
     log.info(text)

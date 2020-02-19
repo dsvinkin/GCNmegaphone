@@ -23,18 +23,20 @@ import get_integral
 info = config.read_config('config.yaml')
 
 # Parameters of the log file
-log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.DEBUG, filename = u"{:s}/{:s}".format(info['log_dir'], 'log.txt'))
+log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u"{:s}/{:s}".format(info['log_dir'], 'log.txt'))
 
 
 current_event_fermi = None
 current_event_integral = None
 
 # See https://gcn.gsfc.nasa.gov/filtering.html
-ArrayType = {
+good_notice_types = {
     '31': 'IPN RAW', 
     '111': 'FERMI GBM FLT POS',
     '112': 'FERMI GBM GND POS', 
     '115': 'FERMI GBM FIN POS',
+    '59':  'KONUS LC',           
+    '60': 'SWIFT BAT GRB ALERT',
     '61': 'SWIFT BAT GRB POS ACK', 
     '84': 'SWIFT BAT TRANS',
     '52': 'INTEGRAL SPIACS',
@@ -44,7 +46,7 @@ ArrayType = {
     '154': 'LVC_CNTRPART',
      }
 
-ArrayParam = {
+notice_parameters = {
     'Packet_Type': 'NOTICE_TYPE', 
     'TrigID': 'TRIGGER_NUM',
     'Sun_Distance': 'SUN_DIST', 
@@ -54,9 +56,11 @@ ArrayParam = {
     'Ecliptic_Long': 'ECL_LONG', 
     'Ecliptic_Lat': 'ECL_LAT',
     'Burst_Inten': 'BURST_INTEN', 
+    'Burst_Signif': 'BURST_SIGNIF',
     'Trig_Timescale': 'TRIG_TIMESCALE',
     'Data_Timescale': 'DATA_TIMESCALE', 
     'Data_Signif': 'DATA_SIGNIF',
+    'Data_Integ': 'DATA_INTEG',
     'Most_Likely_Index': 'MOST_LIKELY', 
     'Most_Likely_Prob': 'MOST_LIKELY_PROB',
     'Sec_Most_Likely_Index': '2nd_MOST_LIKELY',
@@ -217,14 +221,14 @@ class notice:
 
     def print_param(self, key, f):
 
-        name = ArrayParam.get(key, None)
+        name = notice_parameters.get(key, None)
         val = self.dict_par.get(key,None)
         if name is None or val is None:
              log.error("name {:s} is {:s}; val {:s} is {:s}".format(key ,name, key, val))
              return
         
         if (key == 'Packet_Type'):
-            print("{:22s} {:s}".format(name, ArrayType[val]), file=f)
+            print("{:22s} {:s}".format(name, good_notice_types[val]), file=f)
 
         elif (key == 'Most_Likely_Index'):
             print("{:22s} {:s}".format(name, GoodIndex[val]), file=f)
@@ -261,6 +265,8 @@ class notice:
     gcn.notice_types.FERMI_GBM_GND_POS,
     gcn.notice_types.FERMI_GBM_FIN_POS,
     gcn.notice_types.INTEGRAL_SPIACS,
+    gcn.notice_types.KONUS_LC,
+    gcn.notice_types.SWIFT_BAT_GRB_ALERT,
     gcn.notice_types.LVC_PRELIMINARY,
     gcn.notice_types.LVC_INITIAL,
     gcn.notice_types.LVC_UPDATE
@@ -276,7 +282,7 @@ def process_gcn(payload, root):
         #print ("data.role != observation")
         return
   
-    notice_type = ArrayType.get(data.get_value('Packet_Type'), None)
+    notice_type = good_notice_types.get(data.get_value('Packet_Type'), None)
     print("Recieved Packet_Type: {:s} - {:s}".format(data.get_value('Packet_Type'), notice_type)) 
 
     if not notice_type:
@@ -288,13 +294,15 @@ def process_gcn(payload, root):
     
     log.info("Received message info: {:s} {:s} {:s} {:s} {:8.3f}".format(notice_type, event_name, event_gbm_name, event_date, event_time))
 
-    # Respond to only Most_Likely_Index in GoodIndex
+    # Respond to only GBM triggers where Most_Likely_Index in GoodIndex
     MOST_LIKELY_IND = data.get_value('Most_Likely_Index')
-    if MOST_LIKELY_IND and MOST_LIKELY_IND not in GoodIndex:
-        log.info ("MOST_LIKELY_IND is {:s} ({:s}), skip this event!".format(MOST_LIKELY_IND, AllIndex.get(MOST_LIKELY_IND, 'N/A')))
-        return
-    else:
-        log.info ("MOST_LIKELY_IND is {:s} ({:s}), write event info to a file.".format(MOST_LIKELY_IND, AllIndex.get(MOST_LIKELY_IND, 'N/A')))
+
+    if MOST_LIKELY_IND is not None:
+        if MOST_LIKELY_IND not in GoodIndex:
+            log.info ("MOST_LIKELY_IND is {:s} ({:s}), skip this event!".format(MOST_LIKELY_IND, AllIndex.get(MOST_LIKELY_IND, 'N/A')))
+            return
+        else:
+            log.info ("MOST_LIKELY_IND is {:s} ({:s}), write event info to a file.".format(MOST_LIKELY_IND, AllIndex.get(MOST_LIKELY_IND, 'N/A')))
   
     path = "{:s}/{:s}".format(info['data_dir'], event_name)
     if not os.path.exists(path):

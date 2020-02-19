@@ -463,6 +463,6 @@ def tte_to_ascii(path):
 
 if __name__ == "__main__":
 
-    path = 'GRB20180225_T36054'
+    path = '../GRB20200219_T27409'
 
     tte_to_ascii(path)
