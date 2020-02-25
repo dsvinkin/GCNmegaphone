@@ -281,6 +281,7 @@ class notice:
     gcn.notice_types.INTEGRAL_SPIACS,
     gcn.notice_types.KONUS_LC,
     gcn.notice_types.SWIFT_BAT_GRB_ALERT,
+    gcn.notice_types.SWIFT_BAT_GRB_POS_ACK,
     gcn.notice_types.LVC_PRELIMINARY,
     gcn.notice_types.LVC_INITIAL,
     gcn.notice_types.LVC_UPDATE
