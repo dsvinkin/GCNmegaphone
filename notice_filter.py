@@ -32,14 +32,14 @@ current_event_integral = None
 # See https://gcn.gsfc.nasa.gov/filtering.html
 good_notice_types = {
     '31': 'IPN RAW', 
-    '111': 'FERMI GBM FLT POS',
-    '112': 'FERMI GBM GND POS', 
-    '115': 'FERMI GBM FIN POS',
-    '59':  'KONUS LC',           
+    '52': 'INTEGRAL SPIACS',
+    '59': 'KONUS LC', 
     '60': 'SWIFT BAT GRB ALERT',
     '61': 'SWIFT BAT GRB POS ACK', 
     '84': 'SWIFT BAT TRANS',
-    '52': 'INTEGRAL SPIACS',
+    '111': 'FERMI GBM FLT POS',
+    '112': 'FERMI GBM GND POS', 
+    '115': 'FERMI GBM FIN POS',
     '150': 'LVC_PRELIM',
     '151': 'LVC_INITIAL',
     '152': 'LVC_UPDATE',
@@ -47,29 +47,29 @@ good_notice_types = {
      }
 
 notice_parameters = {
-    'Packet_Type': 'NOTICE_TYPE', 
-    'TrigID': 'TRIGGER_NUM',
-    'Sun_Distance': 'SUN_DIST', 
-    'Sun_Hr_Angle': 'SUN_ANGLE',
-    'Galactic_Long': 'GAL_LONG', 
-    'Galactic_Lat': 'GAL_LAT',
-    'Ecliptic_Long': 'ECL_LONG', 
-    'Ecliptic_Lat': 'ECL_LAT',
-    'Burst_Inten': 'BURST_INTEN', 
-    'Burst_Signif': 'BURST_SIGNIF',
+    'Packet_Type':    'NOTICE_TYPE', 
+    'TrigID':         'TRIGGER_NUM', 
+    'Sun_Distance':   'SUN_DIST',    
+    'Sun_Hr_Angle':   'SUN_ANGLE',   
+    'Galactic_Long':  'GAL_LONG',    
+    'Galactic_Lat':   'GAL_LAT',     
+    'Ecliptic_Long':  'ECL_LONG',    
+    'Ecliptic_Lat':   'ECL_LAT',     
+    'Burst_Inten':    'BURST_INTEN', 
+    'Burst_Signif':   'BURST_SIGNIF',
     'Trig_Timescale': 'TRIG_TIMESCALE',
     'Data_Timescale': 'DATA_TIMESCALE', 
-    'Data_Signif': 'DATA_SIGNIF',
-    'Data_Integ': 'DATA_INTEG',
+    'Data_Signif':    'DATA_SIGNIF',
+    'Data_Integ':     'DATA_INTEG',  
     'Most_Likely_Index': 'MOST_LIKELY', 
-    'Most_Likely_Prob': 'MOST_LIKELY_PROB',
+    'Most_Likely_Prob':  'MOST_LIKELY_PROB',
     'Sec_Most_Likely_Index': '2nd_MOST_LIKELY',
     'Sec_Most_Likely_Prob': '2nd_MOST_LIKELY_PROB',
-    'MOON_Distance': 'MOON_DIST',
-    'C1':'GRB_RA',
-    'C2':'GRB_DEC',
-    'Error2Radius': 'GRB_ERROR',
-    'ISOTime':'GRB_TIME',
+    'MOON_Distance':  'MOON_DIST',
+    'C1':             'GRB_RA', 
+    'C2':             'GRB_DEC',
+    'Error2Radius':   'GRB_ERROR',
+    'ISOTime':        'GRB_TIME',
     }
 
 # See https://gcn.gsfc.nasa.gov/sock_pkt_def_doc.html
@@ -81,8 +81,8 @@ GoodIndex = {
     '5': '5  GENERIC_SGR', 
     '6': '6  GENERIC_TRANSIENT',
     '7': '7  DISTANT_PARTICLES', 
-    '10': '10  SGR_1806_20', 
-    '11': '11  GROJ_0422_32'
+    '10':'10  SGR_1806_20', 
+    '11':'11  GROJ_0422_32'
     }
 
 # Sec_Most_Likely_Index
@@ -112,20 +112,6 @@ AllIndex = {
 def qw(s):
     return s.split()
 
-def get_event_name(str_date_time):
-
-    time = datetime.datetime.strptime(str_date_time, "%Y-%m-%dT%H:%M:%S.%f")
-    part_day = int(round((time.hour*60 + time.minute + time.second/60.0) / 1.44))
-  
-    # gbm_name - format yymmddttt
-    gbm_name = "{:s}{:03d}".format(time.strftime('%y%m%d'), part_day)
-    date = time.strftime('%Y%m%d')
-    time_sec = time.hour * 3600 + time.minute * 60 + time.second + time.microsecond/1e6
-  
-    # name - format GRByymmdd_sssss
-    name = "GRB{:s}_T{:05d}".format(time.strftime('%Y%m%d'), int(time_sec))
-  
-    return name, gbm_name, date, time_sec
 
 def run_download_gbm_thread(event_name, event_gbm_name, path):
 
@@ -164,6 +150,8 @@ class notice:
 
         self.role = tree.attrib['role']
 
+        self.gw_packets = qw('150 151 152 154')
+
     def append_payload_to_file(self, file_name):
         with open(file_name, 'ab') as f:
           f.write("------------------------------\n".encode('UTF-8'))
@@ -172,6 +160,8 @@ class notice:
     def _update_dict(self, element, my_dict):
         """
         Code from https://stackoverflow.com/questions/28503666/python-parsing-xml-autoadd-all-key-value-pairs
+
+        TODO: add dataType to my_dict
         """
         # lxml defines "length" of the element as number of its children.
         if len(element):  # If "length" is other than 0.
@@ -191,7 +181,7 @@ class notice:
             elif element.attrib:
                 name = element.attrib.get('name',None)
                 val = element.attrib.get('value',None)
-                if name and val:
+                if name is not None and val is not None:
                     print (name,':', val)
                     my_dict[name] = val
 
@@ -219,11 +209,35 @@ class notice:
     def get_event_time(self):
         return self.dict_par.get('ISOTime', None)
 
+    def get_event_type(self):
+        if self.get_value('Packet_Type') in self.gw_packets:
+            return 'GW'
+        else:
+            return 'GRB'
+
+    def get_event_name(self):
+
+        str_date_time = self.dict_par.get('ISOTime', None)
+       
+        time = datetime.datetime.strptime(str_date_time, "%Y-%m-%dT%H:%M:%S.%f")
+        part_day = int(round((time.hour*60 + time.minute + time.second/60.0) / 1.44))
+      
+        # gbm_name - format yymmddttt
+        gbm_name = "{:s}{:03d}".format(time.strftime('%y%m%d'), part_day)
+        date = time.strftime('%Y%m%d')
+        time_sec = time.hour * 3600 + time.minute * 60 + time.second + time.microsecond/1e6                                            
+                                             
+        # name - format GRByymmdd_sssss
+        name = "{:s}{:s}_T{:05d}".format(self.get_event_type(), time.strftime('%Y%m%d'), int(time_sec))
+      
+        return name, gbm_name, date, time_sec
+
     def print_param(self, key, f):
 
-        name = notice_parameters.get(key, None)
-        val = self.dict_par.get(key,None)
-        if name is None or val is None:
+        name = notice_parameters.get(key, 'None')
+        val = self.dict_par.get(key, 'None')
+
+        if name=='None' or val=='None':
              log.error("name {:s} is {:s}; val {:s} is {:s}".format(key ,name, key, val))
              return
         
@@ -249,7 +263,7 @@ class notice:
 
        with open(file_name, 'a') as f:
           now = datetime.datetime.utcnow()
-          print("{:22s} {:s}".format('Timestamp', now.strftime("%Y-%m-%d %H:%M:%S.%f")), file=f)
+          print("{:22s} {:s}".format('Timestamp', now.strftime("%Y-%m-%d %H:%M:%S")), file=f)
       
           for key in lst_to_print:
               self.print_param(key, f)
@@ -288,8 +302,9 @@ def process_gcn(payload, root):
     if not notice_type:
         return
 
+
     event_date_time = data.get_event_time()
-    event_name, event_gbm_name, event_date, event_time = get_event_name(event_date_time)
+    event_name, event_gbm_name, event_date, event_time = data.get_event_name()
     print(event_name, event_gbm_name, event_date, event_time)
     
     log.info("Received message info: {:s} {:s} {:s} {:s} {:8.3f}".format(notice_type, event_name, event_gbm_name, event_date, event_time))

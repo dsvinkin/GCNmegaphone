@@ -10,39 +10,12 @@ import re
 from astropy.io import fits
 
 import clock
+import path_utils
 import config
 info = config.read_config('config.yaml')
 
 log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u"{:s}/{:s}".format(info['log_dir'], 'log.txt'))
 
-def get_files(path, pattern='', switch=0, all=False):
-    """
-    Find file with specific prefix (switch=1) or suffix (switch=0) 
-    """
-
-    list_files = os.listdir(path)
-
-    if len(list_files) == 0:
-        print("Directory {:s} is empty!".format(list_files))
-        return None
-
-    if switch != 0:
-        file_folder = list(filter(lambda x: x.endswith(pattern), list_files))
-    else:
-        file_folder = list(filter(lambda x: x.startswith(pattern), list_files))
-
-    if len(file_folder) == 0:
-        print("No required file with pattern: {:s}".format(pattern))
-        return None
-
-    print(file_folder)
-
-    if all:
-        return file_folder
-    else:
-        return file_folder[0]
-
-        
 
 def equat2eclipt(fRA, fDec):
     """
@@ -364,7 +337,7 @@ def get_resolution():
 
     resolution = [[-2, 2, 2], [-5, 50, 16], [-10, 100, 64], [-20, 150, 256]]
     #resolution = [[-2, 10, 2], [-5, 20, 16], [-10, 50, 64], [-20, 100, 256]]
-    #resolution = [[-50, 50, 64], [-50, 200, 256]]
+    #resolution = [[-50, 350, 64], [-50, 350, 256]]
     #resolution += [[-1, 1, 1]]
 
     return resolution
@@ -418,11 +391,11 @@ def get_tte_ver(lst_tte):
 
 def tte_to_ascii(path):
 
-    trig_dat = get_files(path, pattern='glg_trigdat_all_bn', switch=0)
-    lst_tte = get_files(path, pattern='glg_tte_n', switch=0, all=True)
+    trig_dat = path_utils.get_files(path, pattern='glg_trigdat_all_bn', prefix=True, all=False)
+    lst_tte = path_utils.get_files(path, pattern='glg_tte_n', prefix=True, all=True)
     tte_ver = get_tte_ver(lst_tte)
     trigger_name = get_trigger_name(trig_dat)
-    GRB_data = get_files(path, pattern='_FER.txt', switch=1)
+    GRB_data = path_utils.get_files(path, pattern='_FER.txt', prefix=False, all=False)
 
     detectors = get_detectors(path, trig_dat)
     resolution = get_resolution()
@@ -463,6 +436,6 @@ def tte_to_ascii(path):
 
 if __name__ == "__main__":
 
-    path = '../GRB20200219_T27409'
+    path = '../GRB20200224_T18349'
 
     tte_to_ascii(path)

@@ -17,6 +17,8 @@ from astropy.io import fits
 import clock
 import tle
 import gbm_tte
+import gbm_map
+import path_utils
 
 data_download_delay = 1200 # s 
 number_of_tte_min = 6
@@ -76,10 +78,9 @@ def download(ftp, path, file_ftp, str_pattern):
 def all_files_are_downloaded(path):
 
     check = False
-    path_folder = os.listdir(path)
-    file_folder = list(filter(lambda x: x.startswith('glg_tte_n'), path_folder))
-    file_trigdat = list(filter(lambda x: x.startswith('glg_trigdat_all'), path_folder))
-    file_loc = list(filter(lambda x: x.startswith('glg_loclist_all'), path_folder))
+    file_folder = path_utils.get_files(path, 'glg_tte_n', prefix=True, all=True)
+    file_trigdat = path_utils.get_files(path, 'glg_trigdat_all', prefix=True, all=True)
+    file_loc = path_utils.get_files(path, 'glg_loclist_all', prefix=True, all=True)
 
     print("TTE: ", file_folder)
     print("trigdat: ", file_trigdat)
@@ -142,24 +143,25 @@ def download_fermi(name, path):
 
     if all_files_are_downloaded(path):
         log.info ("The thread bn{:s} finale!".format(name))
-        path_folder = os.listdir(path)
-        file_folder = list(filter(lambda x: x.startswith('glg_tte_n'), path_folder))
-        file_trigdat = list(filter(lambda x: x.startswith('glg_trigdat'), path_folder))
+
+        file_trigdat = path_utils.get_files(path, 'glg_trigdat', prefix=True, all=True)   
+        file_hpx = path_utils.get_files(path, 'glg_healpix_all', prefix=True, all=True)
+     
+        if len(file_hpx) >0:
+            hpx_path = os.path.join(path, file_hpx[0])
+            gbm_map.get_contours(hpx_path)
 
         eph(file_trigdat, path)
         gbm_tte.tte_to_ascii(path)
 
 if __name__ == '__main__':
 
-    date = '20200129'
-    time = 35324.0
+    date = '20200224'
+    time = 18349.0
 
     path = "../GRB{:s}_T{:05d}".format(date, int(time))
     fod = "{:03.0f}".format(time/86400.0 * 1000)
     event_gbm_name = "{:s}{:s}".format(date[2:], fod)
-
-    #event_gbm_name = '191104527'
-    #path = '../GRB20191104_T45518'
 
     print("Downloading data for {:s} to {:s}".format(event_gbm_name, path))
 
