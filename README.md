@@ -33,16 +33,6 @@ space-track: [login, passw]
 ```
 
 ## Package content
-`notice_filter.py` - contains the main loop  
-`get_fermi.py` - contains functions for dowloading Fermi (GBM) TTE data  
-`gbm_tte.py` - converting GBM TTE data to ascii  
-`get_integral.py` - downloading of the SPI-ACS data  
-`clock.py` - different date and time conversion functions  
-`tle.py` - downloading TLE from space-track.org  
-`gbm_map.py` - 
-
-`test/test_notice_filter.py` - testing script for notice_filter.py
-
 | File                | Description   | 
 | ------------------- | ------------- | 
 | `notice_filter.py`  | The main loop | 
@@ -55,6 +45,8 @@ space-track: [login, passw]
 | `telegram_api.py`   | Sending Telegram messages |
 | `path_utils.py`     | Simple path manipulation functions |
 | `contour.py`        | Healpix contours extraction functions |
+|`test/test_notice_filter.py` | Tests for notice_filter.py |
+|`test/test_notice.py`        | Tests for notice class |
 
 ## Depends on
 
@@ -62,9 +54,9 @@ astropy
 pygcn  
 lxml  
 python-telegram-bot  
-PySocks 
-healpy
-networkx 
+PySocks  
+healpy  
+networkx    
 
 ## Useful links
 [VOEvents in GCN/TAN][6]  
