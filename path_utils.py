@@ -15,8 +15,8 @@ def get_files(path, pattern='', prefix=True, all=False):
     list_files = os.listdir(path)
 
     if len(list_files) == 0:
-        print("Directory {:s} is empty!".format(list_files))
-        return None
+        print("Directory {:s} is empty!".format(path))
+        return []
 
     if prefix:
         file_folder = list(filter(lambda x: x.startswith(pattern), list_files))
@@ -25,12 +25,14 @@ def get_files(path, pattern='', prefix=True, all=False):
 
     if len(file_folder) == 0:
         print("No required file with pattern: {:s}".format(pattern))
+        if all:
+           return []
+        else:
+           return None
 
     #print(file_folder)
 
     if all:
         return file_folder
-    elif not all and len(file_folder) > 0:
-        return file_folder[0]
     else:
-        return None 
+        return file_folder[0]

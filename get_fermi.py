@@ -156,10 +156,10 @@ def download_fermi(name, path):
 
 if __name__ == '__main__':
 
-    date = '20200224'
-    time = 18349.0
+    date = '20200826'
+    time = 79782.72
 
-    path = "../GRB{:s}_T{:05d}".format(date, int(time))
+    path = "data/GRB{:s}_T{:05d}".format(date, int(time))
     fod = "{:03.0f}".format(time/86400.0 * 1000)
     event_gbm_name = "{:s}{:s}".format(date[2:], fod)
 
