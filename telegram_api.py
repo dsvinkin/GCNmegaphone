@@ -6,7 +6,8 @@ import telegram
 import config
 info = config.read_config('config.yaml')
 
-log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u"{:s}/{:s}".format(info['log_dir'], 'log.txt'))
+import setlog
+setlog.set_log()
 
 # Telegram parameters
 chat_id = info['chat_id']
@@ -19,7 +20,8 @@ lst_par = """\
  Data_Timescale 
  Data_Integ 
  Data_Signif 
- Burst_Signif 
+ Burst_Signif
+ Long_short 
  Sun_Distance 
  MOON_Distance 
  Galactic_Lat

@@ -489,7 +489,10 @@ HasRemnant: Probability that a nonzero mass was ejected outside the central remn
 
 def test_gbm():
 
-    payload = payload_gbm_flt2
+    file_name = 'gbm_test_notices/gbm_200228A.txt'
+    with open(file_name) as f:
+        payload = f.read()
+
     payload = payload.encode('UTF-8')
       
     root = fromstring(payload)
@@ -501,28 +504,6 @@ def test_lvc():
     root = fromstring(payload)
     notice_filter.process_gcn(payload, root)
 
-def test_lvc_simple():
 
-    payload = payload_lvc_initial.encode('UTF-8')
-    #payload = payload_gbm.encode('UTF-8')
-    root = fromstring(payload)
-
-    # Get the IVORN, or unique VOEvent ID, and print it.
-    print(root.attrib['ivorn'])
-
-    # Print all of the event attributes.
-    lst_par = root.findall('.//Param')
-    for param in lst_par:
-        name = param.attrib['name']
-        value = param.attrib['value']
-        text = ''
-        if len(param):
-            text = param[0].text
-        #print('{} = {}'.format(name, value))
-        print('{:s}: {:s}'.format(name, text))
-
-    print (root.findall('.//ISOTime')[0].text)
-
-#test_lvc_simple()
 #test_lvc()
 test_gbm()

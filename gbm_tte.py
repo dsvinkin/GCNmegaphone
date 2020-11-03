@@ -14,7 +14,8 @@ import path_utils
 import config
 info = config.read_config('config.yaml')
 
-log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u"{:s}/{:s}".format(info['log_dir'], 'log.txt'))
+import setlog
+setlog.set_log()
 
 
 def equat2eclipt(fRA, fDec):
@@ -221,15 +222,27 @@ class GBMTTEFile(object):
         """
         
         bins = np.arange(start, stop+1.5*dt, step=dt)
-        arrival_times = []
+        interval_deadtime = np.zeros_like(bins[1:])
+        interval_corr = np.zeros_like(bins[1:])
         
+        """
+        for i, (t_beg, t_end) in enumerate(zip(bins[:-1]+self._trigger_time, bins[1:]+self._trigger_time)):
+
+            mask = np.logical_and(t_beg <= self._events, self._events<=t_end)
+            interval_deadtime[i] = (self._deadtime[mask]).sum()
+            interval_corr[i] = 1.0 / (1.0 - interval_deadtime[i]/(t_end-t_beg))
+            #print("{:d} {:.3f} {:.1e}".format(i, t_beg-self._trigger_time,  interval_deadtime[i]))
+        """
+
+        arrival_times = []
         for i in range(len(self._pha)):
             if self._pha[i] >= channel_start and self._pha[i] <= channel_end:
                 arrival_times.append(self._events[i] - self._trigger_time)
         
         counts, bins = np.histogram(np.array(arrival_times), bins=bins)
-        time_bins = np.array(list(zip(bins[:-1], bins[1:])))
+        #time_bins = np.array(list(zip(bins[:-1], bins[1:])))
         
+        #return counts*interval_corr, bins[:-1]
         return counts, bins[:-1]
 
 
@@ -335,10 +348,10 @@ def get_resolution():
     resolution = [[t_start_1, t_end_1, res_1],...]
     """
 
-    resolution = [[-2, 2, 2], [-5, 50, 16], [-10, 100, 64], [-20, 150, 256]]
-    #resolution = [[-2, 10, 2], [-5, 20, 16], [-10, 50, 64], [-20, 100, 256]]
-    #resolution = [[-50, 350, 64], [-50, 350, 256]]
-    #resolution += [[-1, 1, 1]]
+    resolution = [[-1, 10, 2], [-5, 50, 16], [-10, 100, 64], [-20, 150, 256]]
+    #resolution = [ [-10, 50, 16], [-10, 100, 64], [-20, 400, 256]]
+    #resolution = [[126,134,2], [50, 150, 16], [40, 160, 64], [-20, 160, 256]]
+    #resolution = [[5, 10, 2]]
 
     return resolution
 
@@ -360,17 +373,18 @@ def print_data(path, date, sod, res, bins, counts, str_info):
     Create a lightcurve file
     """
 
-    #file_name = os.path.join(path, "gbm_tte_{:s}_{:05d}_{:d}ms.thr".format(date, int(sod), res))
-    file_name = os.path.join(path, "GRB{:s}_GBM_{:d}ms.thr".format(date[2:], res))
+    #file_name = os.path.join(path, "GRB{:s}_GBM_{:d}ms_dt.thr".format(date[2:], int(res)))
+    file_name = os.path.join(path, "GRB{:s}_GBM_{:d}ms.thr".format(date[2:], int(res)))
 
     with open(file_name, 'w') as f:
 
         f.write("{:s}".format(str_info))
 
         for i_time in range(len(bins)):
-            f.write("\n{:<11.3f}".format(bins[i_time]))
+            f.write("\n{:<11.5f}".format(bins[i_time]))
             for i_ch in range(counts.shape[0]):
                 f.write(" {:>5d}".format(counts[i_ch,i_time]))
+                #f.write(" {:9.3f}".format(counts[i_ch,i_time]))
 
     print('File {:s} has been created.'.format(file_name))
 
@@ -436,6 +450,6 @@ def tte_to_ascii(path):
 
 if __name__ == "__main__":
 
-    path = '../GRB20200224_T18349'
+    path = '../GRB20201016_T01669'
 
     tte_to_ascii(path)

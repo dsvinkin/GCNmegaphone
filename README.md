@@ -51,6 +51,7 @@ space-track: [login, passw]
 ## Depends on
 
 astropy  
+astroquery  
 pygcn  
 lxml  
 python-telegram-bot  

@@ -141,3 +141,23 @@ def mjd2week(mjd):
 def week2mjd(week):
     return (week - 1)*7. + 50115.
 
+def sod_to_hhmmss(seconds, use_codes=False, isMS=False):
+    hours = int(seconds / 3600)
+    seconds -= 3600.0 * hours
+    minutes = int(seconds / 60.0)
+    seconds -= int(60.0 * minutes)
+
+    if isMS:
+        return "{:02d}:{:02d}:{:02.3f}".format(hours, minutes, seconds)
+
+    if use_codes:
+        return "{:02d}%3A{:02d}%3A{:02.0f}".format(hours, minutes, seconds)
+    else:
+        return "{:02d}:{:02d}:{:02.0f}".format(hours, minutes, seconds)
+
+def get_str_date_time(date, time, use_codes=False):
+    """
+    date    str yyyymmdd
+    time    float seconds of day
+    """
+    return "{:s}-{:s}-{:s}T{:s}".format(date[:4], date[4:6], date[6:8], sod_to_hhmmss(time, use_codes=use_codes))

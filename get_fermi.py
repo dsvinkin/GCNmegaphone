@@ -18,6 +18,7 @@ import clock
 import tle
 import gbm_tte
 import gbm_map
+import gbm_trigdat
 import path_utils
 
 data_download_delay = 1200 # s 
@@ -26,11 +27,12 @@ number_of_tte_min = 6
 import config
 info = config.read_config('config.yaml')
 
-log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u"{:s}/{:s}".format(info['log_dir'], 'log.txt'))
+import setlog
+setlog.set_log()
 
-def eph(list_trigdat, path):
+def eph(file_trigdat, path):
 
-    hdul = fits.open("{:s}/{:s}".format(path, list_trigdat[0]))
+    hdul = fits.open(os.path.join(path, file_trigdat))
     trigtime = hdul[0].header['TRIGTIME']
     dateutc = clock.fermi2utc(trigtime)
     ms = str(round(dateutc.microsecond/1e6, 3))
@@ -138,11 +140,13 @@ def download_fermi(name, path):
         except Exception as e:
             log.error("Got error {:s} during GBM data downloading.".format(str(e), name))
 
+        process_trigdat(path)
+
         if k > 1:
             sleep(data_download_delay)
 
     if all_files_are_downloaded(path):
-        log.info ("The thread bn{:s} finale!".format(name))
+        log.info("The thread bn{:s} finale!".format(name))
 
         file_trigdat = path_utils.get_files(path, 'glg_trigdat', prefix=True, all=True)   
         file_hpx = path_utils.get_files(path, 'glg_healpix_all', prefix=True, all=True)
@@ -151,13 +155,29 @@ def download_fermi(name, path):
             hpx_path = os.path.join(path, file_hpx[0])
             gbm_map.get_contours(hpx_path)
 
-        eph(file_trigdat, path)
+        process_trigdat(path)
+        #eph(file_trigdat, path)
         gbm_tte.tte_to_ascii(path)
+
+
+def process_trigdat(path):
+
+    file_trigdat = path_utils.get_files(path, 'glg_trigdat', prefix=True, all=False)
+    ascii_files = path_utils.get_files(path, 'gbm_tdat_', prefix=True, all=True)
+
+    if file_trigdat is None or len(ascii_files) > 0:
+        return
+
+    eph(file_trigdat, path)
+
+    file_trigdat = os.path.join(path, file_trigdat)
+    gbm_trigdat.trigdat2ascii(file_trigdat)
+
 
 if __name__ == '__main__':
 
-    date = '20200224'
-    time = 18349.0
+    date = '20201025'
+    time =  67715.43
 
     path = "../GRB{:s}_T{:05d}".format(date, int(time))
     fod = "{:03.0f}".format(time/86400.0 * 1000)

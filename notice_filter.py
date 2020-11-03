@@ -19,15 +19,18 @@ import config
 import telegram_api
 import get_fermi
 import get_integral
+import get_hend 
 
 info = config.read_config('config.yaml')
 
 # Parameters of the log file
-log.basicConfig(format = u'[%(asctime)s]  %(message)s', level = log.INFO, filename = u"{:s}/{:s}".format(info['log_dir'], 'log.txt'))
+import setlog
+setlog.set_log()
 
 
 current_event_fermi = None
 current_event_integral = None
+current_event_hend = None
 
 # See https://gcn.gsfc.nasa.gov/filtering.html
 good_notice_types = {
@@ -70,6 +73,7 @@ notice_parameters = {
     'C2':             'GRB_DEC',
     'Error2Radius':   'GRB_ERROR',
     'ISOTime':        'GRB_TIME',
+    'Long_short':     'LONG_OR_SHORT'
     }
 
 # See https://gcn.gsfc.nasa.gov/sock_pkt_def_doc.html
@@ -120,7 +124,7 @@ def run_download_gbm_thread(event_name, event_gbm_name, path):
   
     if (current_event_fermi != event_name and not thread_fermi.is_alive()):
         thread_fermi.start()
-        log.info ("The thread {:s} started".format(event_name+'_FER'))
+        log.info("The thread {:s} started".format(event_name+'_FER'))
         current_event_fermi = event_name
     else:
         log.info ("The thread {:s} is already working".format(event_name+'_FER'))
@@ -128,7 +132,7 @@ def run_download_gbm_thread(event_name, event_gbm_name, path):
 def run_download_int_thread(event_name, date, time, path):
   
     global current_event_integral
-    thread_integral = threading.Thread(target = get_integral.download_integral, args=(date, time, 200, path))
+    thread_integral = threading.Thread(target = get_integral.download_integral_loop, args=(date, time, 200, path))
 
     if (current_event_integral != event_name and not thread_integral.is_alive()):
         thread_integral.start()
@@ -136,6 +140,18 @@ def run_download_int_thread(event_name, date, time, path):
         current_event_integral = event_name
     else:
         log.info ("The thread {:s} is already working".format(event_name+'_INT'))
+
+def run_download_hend_thread(event_name, date, time, path):
+
+    global current_event_hend
+    thread_hend = threading.Thread(target = get_hend.download_hend_loop, args = (date, time, path))
+  
+    if (current_event_hend != event_name and not thread_hend.is_alive()):
+        thread_hend.start()
+        log.info("The thread {:s} started".format(event_name+'_HEND'))
+        current_event_hend = event_name
+    else:
+        log.info("The thread {:s} is already working".format(event_name+'_HEND'))
 
 class notice:
 
@@ -216,6 +232,13 @@ class notice:
             return 'GRB'
 
     def get_event_name(self):
+        """
+        Returns:  
+        name      GW/GRByyyymmdd_Tsssss 
+        gbm_name  yymmddfff
+        date      yyyymmdd
+        time_sec  float seconds of day
+        """
 
         str_date_time = self.dict_par.get('ISOTime', None)
        
@@ -335,10 +358,11 @@ def process_gcn(payload, root):
     if notice_type in ('FERMI GBM FLT POS', 'FERMI GBM GND POS', 'FERMI GBM FIN POS'):
         run_download_gbm_thread(event_name, event_gbm_name, path)
         run_download_int_thread(event_name, event_date, int(event_time), path)
+        run_download_hend_thread(event_name, event_date, int(event_time), path)
 
     elif notice_type in ('INTEGRAL SPIACS', 'IPN RAW', 'LVC_PRELIM'):
         run_download_int_thread(event_name, event_date, int(event_time), path)
-
+        run_download_hend_thread(event_name, event_date, int(event_time), path)
 
 if __name__ == "__main__":
     # Listen for GCNs until the program is interrupted (killed or interrupted with control-C).

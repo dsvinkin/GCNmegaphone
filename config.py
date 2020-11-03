@@ -16,8 +16,9 @@ def read_config(file_name):
 if __name__ == "__main__":
 
     info = read_config('config.yaml')
-    print(info)
+    #print(info)
 
-    keys = "telegram_proxy bot_token chat_id log_dir".split()
+    #keys = "telegram_proxy bot_token chat_id log_dir HEND".split()
+    keys = info.keys()
     for key in keys:
-        print("{:16s}: {:s}".format(key, info[key]))
+        print("{:16s}: {:s}".format(key, str(info[key]) ))

@@ -17,86 +17,89 @@ import os
 import numpy as np
 import healpy as hp
 
-import contour
+import ligo.skymap.postprocess.contour as contour
+from ligo.skymap.io import fits
 
-def print_contour(lst_cont, levels, file):
+
+def get_pos_center(prob):
+
+    # Most probable sky location
+    ipix_max = np.argmax(prob)
+
+    npix = len(prob)
+    nside = hp.npix2nside(npix)
+    theta, phi = hp.pix2ang(nside, ipix_max, nest=True)
+    
+
+    ra = np.rad2deg(phi)
+    dec = np.rad2deg(0.5 * np.pi - theta)
+
+    return ra, dec
+
+def print_contour(lst_cont, levels, file_name):
 
     n_lev = len(lst_cont)
+    #print(lst_cont)
+    #exit()
+
+    f = open(file_name, 'w')
     for i_lev in range(n_lev):
 
         n_poly = len(lst_cont[i_lev])
-        #file.write("Conf level {:8.3f}\nNumber of polygon: {:d}\n".format(levels[i_lev], n_poly))
-        file.write("-- --\n")
+        print("\nConf level {:8.3f}\nNumber of polygon: {:d}".format(levels[i_lev], n_poly))
         
         for i_poly in range(n_poly):
             n_vert = len(lst_cont[i_lev][i_poly])
-            #file.write("Number of vertices: {:d}\n".format(n_vert))
-            file.write("-- --\n")
+            print("Polygon {:d}: Number of vertices: {:d}".format(i_poly, n_vert))
+
+            ra_prev = lst_cont[i_lev][i_poly][0][0]
             for i_ver in range(n_vert):
-                file.write("{:8.3f} {:8.3f}\n".format(lst_cont[i_lev][i_poly][i_ver][0], lst_cont[i_lev][i_poly][i_ver][1]))
+                ra = lst_cont[i_lev][i_poly][i_ver][0]
+                dec = lst_cont[i_lev][i_poly][i_ver][1]
+       
+                if np.abs(ra - ra_prev) >=270.0:
+                    f.write("-- --\n")
 
-def get_area(hpx, prob):
-   print ("Calculate sky area for given prob.")
-   arr_idx = None
-   for i in range(8000, len(hpx)):
-       idx = hpx.argsort()[-i:][::-1]
-       prob_curr = hpx[idx].sum()
-       #print idx, prob_curr
-       if(prob<prob_curr):
-           arr_idx = idx
-           break
+                f.write("{:8.3f} {:8.3f}\n".format(ra, dec))
+                ra_prev = ra
 
-   if arr_idx is None:
-       print ("Fail")
-       return None
+            f.write("-- --\n")
 
-   npix = len(hpx)
-   sky_area = 4 * 180**2 / np.pi
-   pix_area = sky_area / npix 
-   
-   
-   print(pix_area, len(arr_idx))
-   print("Sky area:", pix_area * len(arr_idx))
-   return pix_area * len(arr_idx)
+    f.close()
 
 def get_contours(path):
     """
-    NSIDE = 128
-    ORDERING = NESTED in fits file
-    INDXSCHM = IMPLICIT
-    Ordering converted to RING
-
+    See https://github.com/lpsinger/ligo.skymap/blob/master/ligo/skymap/tool/ligo_skymap_contour.py
     
     """
    
     p_1sigma = 0.682689492137
     p_2sigma = 0.954499736104
     p_3sigma = 0.997300203937
-    levels = (1-p_1sigma, 1-p_2sigma, 1-p_3sigma)
-    #levels = (1-p_1sigma, 1-p_2sigma)
+    levels = np.array([p_1sigma, p_2sigma, p_3sigma]) * 100
+ 
+    prob, _ = fits.read_sky_map(path, nest=True)
+
+    # Find credible levels
+    i = np.flipud(np.argsort(prob))
+    cumsum = np.cumsum(prob[i])
+    cls = np.empty_like(prob)
+    cls[i] = cumsum * 100
     
-
-    data = hp.read_map(path, field=1)
-    
-    print(data)
-    print(np.sum(data))
-
-    npix = len(data)
-    sky_area = 4 * 180**2 / np.pi
-    print (npix, sky_area, sky_area / npix)
-
-    #hpx = hp.read_map(file_name, field=0)
-    #get_area(hpx, p_2sigma)
+    lst_cont = contour(cls, levels, degrees=True, nest=True, simplify=False)
+    print(levels, len(lst_cont[0]))
     #exit()
-    
-    #lst_cont = contour.contour(data, levels, nest=False, degrees=True, simplify=True)
-    lst_cont = contour.contour(data, levels, nest=False, degrees=True)
+
+    ra, dec = get_pos_center(prob)
+    print("Max prob position: {:.3f} {:.3f}".format(ra, dec))
+
+    lst_cont = [[[[ra, dec]]]] + lst_cont # [lev[polys[points[ra, dec]]]]
+    levels = np.append([0], levels)
 
     file_name = os.path.splitext(path)[0] + '_cont.txt'
-    with open(file_name, 'w') as file:
-        print_contour(lst_cont, levels, file)
+    print_contour(lst_cont, levels, file_name)
 
 if __name__ == '__main__':
 
-    path = '../GRB20200224_T35924/glg_healpix_all_bn200224416_v00.fit'
+    path = '../GRB20201103_T22389/glg_healpix_all_bn201103259_v00.fit'
     get_contours(path)
