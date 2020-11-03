@@ -46,7 +46,7 @@ def eph(file_trigdat, path):
     with open("{:s}/{:s}".format(path, 'fermi_date_time.txt'),'w') as out_file:
         out_file.write(str_out)
     
-    log.info ("File fermi_data_time.txt is created!")
+    log.info("File fermi_data_time.txt is created!")
 
     sc_name = 'Fermi'
     str_date = dateutc.strftime("%Y%m%d")
@@ -179,7 +179,8 @@ if __name__ == '__main__':
     date = '20201025'
     time =  67715.43
 
-    path = "../GRB{:s}_T{:05d}".format(date, int(time))
+
+    path = "data/GRB{:s}_T{:05d}".format(date, int(time))
     fod = "{:03.0f}".format(time/86400.0 * 1000)
     event_gbm_name = "{:s}{:s}".format(date[2:], fod)
 
