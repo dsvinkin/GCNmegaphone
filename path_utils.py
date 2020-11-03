@@ -30,3 +30,16 @@ def get_files(path, pattern='', prefix=True, all=False):
         return file_folder
     else:
         return file_folder[0]
+
+def file_is_ok(file_name, min_size):
+
+    size = 0
+    if os.path.isfile(file_name): 
+        size = os.path.getsize(file_name)
+    
+    log.info("File {:s} has size: {:d} B".format(file_name, size))
+
+    if (size >= min_size * 1024):
+        return True
+    else:
+        return False
