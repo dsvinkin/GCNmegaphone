@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function
-
 import os
 import logging as log
 
@@ -21,8 +19,8 @@ import gbm_map
 import gbm_trigdat
 import path_utils
 
-data_download_delay = 1200 # s 
-number_of_tte_min = 6
+data_download_delay = 1200 # s
+number_of_tte_min = 12
 
 import config
 info = config.read_config('config.yaml')
@@ -35,22 +33,22 @@ def eph(file_trigdat, path):
     hdul = fits.open(os.path.join(path, file_trigdat))
     trigtime = hdul[0].header['TRIGTIME']
     dateutc = clock.fermi2utc(trigtime)
-    ms = str(round(dateutc.microsecond/1e6, 3))
-    time2sec = dateutc.hour*3600+dateutc.minute*60+dateutc.second
+    ms = dateutc.microsecond/1e6
+    time2sec = dateutc.hour*3600 + dateutc.minute*60 + dateutc.second + ms
 
-    str_datetime1 = dateutc.strftime("%Y-%m-%d %H:%M:%S")+ms[1:]
-    str_datetime2 = dateutc.strftime("%Y%m%d")+' '+str(time2sec)+ms[1:]
+    str_datetime1 = dateutc.strftime("%Y-%m-%d %H:%M:%S.%f")
+    str_datetime2 = dateutc.strftime("%Y%m%d")+' '+str(time2sec)
     str_out = 'TRIGTIME={:f}\n{:s}\n{:s}'.format(trigtime, str_datetime1, str_datetime2)
-        
+
 
     with open("{:s}/{:s}".format(path, 'fermi_date_time.txt'),'w') as out_file:
         out_file.write(str_out)
-    
+
     log.info("File fermi_data_time.txt is created!")
 
     sc_name = 'Fermi'
     str_date = dateutc.strftime("%Y%m%d")
-    str_time = str(time2sec)+ms[1:]
+    str_time = str(time2sec)
 
     tle.get_ephemeris(sc_name, str_date, str_time, path)
 
@@ -71,9 +69,9 @@ def download(ftp, path, file_ftp, str_pattern):
     #print(file_ftp)
 
     if file_ftp != file_folder:
-        for file_ftp in sorted(set(file_ftp) - set(file_folder)):
-            log.info("Downloading {:s}".format(file_ftp))
-            ftp.retrbinary('RETR ' + file_ftp, open(path+'/'+file_ftp,'wb').write)
+        for f in sorted(set(file_ftp) - set(file_folder)):
+            log.info(f"Downloading {f}")
+            ftp.retrbinary(f'RETR {f}', open(path+'/'+f,'wb').write)
     else:
         log.info ("No new files in format -> {:s}".format(str_pattern))
 
@@ -87,7 +85,7 @@ def all_files_are_downloaded(path):
     print("TTE: ", file_folder)
     print("trigdat: ", file_trigdat)
     print("loclist: ", file_loc)
-    
+
     if (len(file_folder) >= number_of_tte_min and len(file_trigdat) >= 1): # and len(file_loc)>=1):
         check = True
     return check
@@ -95,7 +93,7 @@ def all_files_are_downloaded(path):
 def download_fermi(name, path):
 
     ftp_dir = "fermi/data/gbm/triggers/20{:s}/bn{:s}/current".format(name[0:2], name)
-    
+
     k = 0
     k_max = 40
 
@@ -115,14 +113,14 @@ def download_fermi(name, path):
 
             ftp.cwd(ftp_dir)
             log.info("Path of the ftp directory {:s}".format(ftp_dir))
-      
+
             lc_tot_ftp = nlst(ftp, 'glg_lc_tot*pdf')
             trigdat_all_ftp = nlst(ftp, 'glg_trigdat_all*fit')
             loclist_all_ftp = nlst(ftp, 'glg_loclist_all*txt')
             healpix_ftp = nlst(ftp, 'glg_healpix_all*fit')
             tte_n_ftp = nlst(ftp, 'glg_tte_n*fit')
             glg_tcat_all_ftp = nlst(ftp, 'glg_tcat_all*fit')
-           
+
             download(ftp, path, lc_tot_ftp, 'glg_lc_tot')
             download(ftp, path, trigdat_all_ftp, 'glg_trigdat_all')
             download(ftp, path, loclist_all_ftp, 'glg_loclist_all')
@@ -148,10 +146,11 @@ def download_fermi(name, path):
     if all_files_are_downloaded(path):
         log.info("The thread bn{:s} finale!".format(name))
 
-        file_trigdat = path_utils.get_files(path, 'glg_trigdat', prefix=True, all=True)   
+        file_trigdat = path_utils.get_files(path, 'glg_trigdat', prefix=True, all=True)
         file_hpx = path_utils.get_files(path, 'glg_healpix_all', prefix=True, all=True)
-     
+
         if len(file_hpx) >0:
+            print(file_hpx)
             hpx_path = os.path.join(path, file_hpx[0])
             gbm_map.get_contours(hpx_path)
 
@@ -176,20 +175,28 @@ def process_trigdat(path):
 
 if __name__ == '__main__':
 
-    date = '20201025'
-    time =  67715.43
+    grb_list = 'grb_list.txt'
+    #grb_list = 'grb_list_gbm_cat.txt'
 
+    lst_datetime = []
+    with open(grb_list) as f:
+        lines = f.read().split('\n')
 
-    path = "data/GRB{:s}_T{:05d}".format(date, int(time))
-    fod = "{:03.0f}".format(time/86400.0 * 1000)
-    event_gbm_name = "{:s}{:s}".format(date[2:], fod)
+        lst_datetime = [(s.split()[0], float(s.split()[1])) for s in lines if s.split()[0][0] !='#' ]
 
-    print("Downloading data for {:s} to {:s}".format(event_gbm_name, path))
+    for (date, time) in lst_datetime:
+        path = "../GRB{:s}_T{:05d}".format(date, int(time))
+        #ifod = int(time/86400.0 * 1000)
+        #fod = "{:03d}".format(ifod)
+        fod = "{:03.0f}".format(time/86400.0 * 1000)
+        event_gbm_name = "{:s}{:s}".format(date[2:], fod)
 
-    if not os.path.isdir(path):
-        os.makedirs(path)
-    
-    #exit()
+        print("Downloading data for {:s} to {:s}".format(event_gbm_name, path))
 
-    download_fermi(event_gbm_name, path)
-    #eph(('glg_trigdat_all_bn181222841_v00.fit',''), path)
+        if not os.path.isdir(path):
+            os.makedirs(path)
+
+        #exit()
+
+        download_fermi(event_gbm_name, path)
+        #eph(('glg_trigdat_all_bn181222841_v00.fit',''), path)

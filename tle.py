@@ -19,11 +19,14 @@ import sys
 import re
 import os
 import subprocess
-import logging
+import logging as log
 from datetime import datetime, timedelta
 
 import config
 info = config.read_config('config.yaml')
+
+import setlog
+setlog.set_log()
 
 def get_tle(str_date, sc_id):
 
@@ -47,7 +50,7 @@ def get_tle(str_date, sc_id):
         s.post(url, data=payload)
         response = s.get(args)
     except:
-        logging.error("Request to {:s} was failed.".format(url))
+        log.error("Request to {:s} was failed.".format(url))
         return None
 
     return response.text
@@ -64,7 +67,7 @@ def get_ephemeris(str_sc_name, str_date, str_time, path):
     }
 
     if not str_sc_name in dic_sc:
-        logging.info("No NORAD ID for {:s}".format(str_sc_name))
+        log.info("No NORAD ID for {:s}".format(str_sc_name))
         return None, None, None 
 
     sc_id = dic_sc[str_sc_name]

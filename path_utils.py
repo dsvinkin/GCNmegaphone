@@ -1,5 +1,6 @@
 import os
 
+import logging as log
 import setlog
 setlog.set_log()
 
@@ -32,6 +33,9 @@ def get_files(path, pattern='', prefix=True, all=False):
         return file_folder[0]
 
 def file_is_ok(file_name, min_size):
+
+    if file_name is None:
+        return False
 
     size = 0
     if os.path.isfile(file_name): 

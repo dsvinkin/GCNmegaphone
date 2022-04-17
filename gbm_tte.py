@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function
-
 import logging as log
 import numpy as np
 import os
@@ -95,11 +93,15 @@ class GBMTTEFile(object):
         except:
 
             # For continuous data
-            warnings.warn("There is no trigger time in the TTE file. Must be set manually or using MET relative times.")
+            print("There is no trigger time in the TTE file. Must be set manually or using MET relative times.")
 
             self._trigger_time = 0
 
-        self._src_name = tte['PRIMARY'].header['OBJECT']
+        try:
+            self._src_name = tte['PRIMARY'].header['OBJECT']
+        except:
+            print("There is no object name in the TTE file. Set to ''")
+            self._src_name = ''
 
         self._start_events = tte['PRIMARY'].header['TSTART']
         self._stop_events = tte['PRIMARY'].header['TSTOP']
@@ -335,7 +337,7 @@ def get_detectors(path, file_name):
                 detectors.append(str(el))
  
 
-        with open(det_file, 'w') as out:        
+        with open(det_file, 'w') as out:
             for el in detectors:
                 out.write(el+' ')
 
@@ -348,10 +350,8 @@ def get_resolution():
     resolution = [[t_start_1, t_end_1, res_1],...]
     """
 
-    resolution = [[-1, 10, 2], [-5, 50, 16], [-10, 100, 64], [-20, 150, 256]]
-    #resolution = [ [-10, 50, 16], [-10, 100, 64], [-20, 400, 256]]
-    #resolution = [[126,134,2], [50, 150, 16], [40, 160, 64], [-20, 160, 256]]
-    #resolution = [[5, 10, 2]]
+    resolution = info['GBM']['resolutions']
+    #resolution = [[-10, 50, 16], [-20, 100, 64], [-20, 200, 256], [-20, 200, 512]]
 
     return resolution
 
@@ -434,7 +434,7 @@ def tte_to_ascii(path):
     for det in detectors:
         tte_file = os.path.join(path, "glg_tte_n{:s}_{:s}_v{:s}.fit".format(det, trigger_name, tte_ver))
         tte = GBMTTEFile(ttefile=tte_file)
-
+       
         str_info, date, sod = tte.get_info(e_bounds)
 
         lc.add_info(det, str_info)
@@ -447,9 +447,49 @@ def tte_to_ascii(path):
         bins, counts, str_info = lc.get_sum_det_lc(res[2])
         print_data(path, date, sod, res[2], bins, counts, str_info)
 
+def tte_to_ascii_continous(path, date_, hour, tte_ver, t0_met, lst_det, ecl_lat):
+
+    #lst_tte = path_utils.get_files(path, pattern='glg_tte_n', prefix=True, all=True)
+    resolution = get_resolution()
+
+    e_bounds = get_channel_bounds(ecl_lat)
+
+    lc = light_curve()
+
+    for det in lst_det:
+        tte_file = os.path.join(path, "glg_tte_n{:s}_{:s}_{:s}_v{:s}.fit.gz".format(det, date_, hour, tte_ver))
+        tte = GBMTTEFile(ttefile=tte_file)
+        tte.trigger_time = t0_met
+
+        str_info, date, sod = tte.get_info(e_bounds)
+
+        lc.add_info(det, str_info)
+        for res in resolution:
+            bins, counts = tte.get_multichannel_lc(res, e_bounds)
+            #print("Det, res: ", det, res[2])
+            lc.add_lc(det, res[2], bins, counts)
+
+ 
+    str_out = 'TRIGTIME={:f}\n{:s} {:f}'.format(t0_met, date, sod)
+    with open("{:s}/{:s}".format(path, 'fermi_date_time.txt'),'w') as f:
+        f.write(str_out)
+    
+    for res in resolution:
+        bins, counts, str_info = lc.get_sum_det_lc(res[2])
+        print_data(path, date, sod, res[2], bins, counts, str_info)
+
 
 if __name__ == "__main__":
 
-    path = '../GRB20201016_T01669'
+    path = '../GRB20220412_T61608'
 
+    # Build lc from trigger tte data
     tte_to_ascii(path)
+
+    # Build lc from continous tte data
+    t0_met = 671476014.072000
+    lst_det = '0 1 2 3 4 5'.split()
+    date = '220412'
+    hour = '17z'
+    tte_ver = '00'
+    #tte_to_ascii_continous(path, date, hour, tte_ver, t0_met, lst_det, 90)
