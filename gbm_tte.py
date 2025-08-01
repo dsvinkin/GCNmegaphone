@@ -210,11 +210,11 @@ class GBMTTEFile(object):
         str_info = "SrcName: {:s}\nT0 = {:.3f} MET\n".format(self._src_name, self._trigger_time)
         str_info += "{:>11s}".format('Emin (keV):')
         for i in range(len(bounds)):
-            str_info += "{:>6.1f}".format(self._emin[bounds[i][0]])
+            str_info += "{:>8.1f}".format(self._emin[bounds[i][0]])
     
         str_info +="\n{:>11s}".format('Emax (keV):')
         for i in range(len(bounds)):
-            str_info +="{:>6.1f}".format(self._emax[bounds[i][1]])
+            str_info +="{:>8.1f}".format(self._emax[bounds[i][1]])
     
         return str_info, date, sod
 
@@ -286,7 +286,11 @@ class light_curve:
 
         self.lst_det.append(det)
         self.lst_res.append(res)
-        self.dict_lc[(det,res)] = (bins, counts)
+        self.dict_lc[(det, res)] = (bins, counts)
+
+    def get_lc(self, det, res):
+
+        return self.dict_lc[(det, res)][0], self.dict_lc[(det, res)][1], self.dict_info[det]
 
     def get_sum_det_lc(self, res):
         set_det = set(self.lst_det)
@@ -317,9 +321,7 @@ def get_detectors(path, file_name):
 
         with open(det_file, 'r') as det:
             text = det.read()
-            text = ''.join(text.split())
-            for s in text:
-                detectors.append(s)
+            detectors = text.split()
 
     else:
         hdul = fits.open(fits_file)
@@ -368,13 +370,14 @@ def get_channel_bounds(Dec):
     return bounds
 
 
-def print_data(path, date, sod, res, bins, counts, str_info):
+def print_data(path, date, sod, res, bins, counts, str_info, det=None):
     """
     Create a lightcurve file
     """
-
-    #file_name = os.path.join(path, "GRB{:s}_GBM_{:d}ms_dt.thr".format(date[2:], int(res)))
-    file_name = os.path.join(path, "GRB{:s}_GBM_{:d}ms.thr".format(date[2:], int(res)))
+    if det is not None:
+        file_name = os.path.join(path, "GRB{:s}_GBM_{:s}_{:d}ms.thr".format(date[2:], det, int(res)))
+    else:
+        file_name = os.path.join(path, "GRB{:s}_GBM_{:d}ms.thr".format(date[2:], int(res)))
 
     with open(file_name, 'w') as f:
 
@@ -403,10 +406,10 @@ def get_tte_ver(lst_tte):
     #print("TTE ver: ", ver)
     return ver
 
-def tte_to_ascii(path):
+def tte_to_ascii(path, all_det=False):
 
     trig_dat = path_utils.get_files(path, pattern='glg_trigdat_all_bn', prefix=True, all=False)
-    lst_tte = path_utils.get_files(path, pattern='glg_tte_n', prefix=True, all=True)
+    lst_tte = path_utils.get_files(path, pattern='glg_tte_', prefix=True, all=True)
     tte_ver = get_tte_ver(lst_tte)
     trigger_name = get_trigger_name(trig_dat)
     GRB_data = path_utils.get_files(path, pattern='_FER.txt', prefix=False, all=False)
@@ -427,25 +430,48 @@ def tte_to_ascii(path):
     print("RA, Dec  are from {:s}: {:8.3f} {:8.3f}".format(str_src, RA, Dec))
     RA, Dec = equat2eclipt(RA, Dec)
 
-    e_bounds = get_channel_bounds(Dec)
-
+    e_bounds_nai = get_channel_bounds(Dec)
+    e_bounds_bgo = [[7, 31], [32, 66], [67, 125]]
 
     lc = light_curve()
     for det in detectors:
-        tte_file = os.path.join(path, "glg_tte_n{:s}_{:s}_v{:s}.fit".format(det, trigger_name, tte_ver))
-        tte = GBMTTEFile(ttefile=tte_file)
-       
-        str_info, date, sod = tte.get_info(e_bounds)
 
-        lc.add_info(det, str_info)
+        sdet = det
+        e_bounds = e_bounds_bgo
+
+        if len(det) == 1:
+            sdet = "n{:s}".format(det)
+            e_bounds = e_bounds_nai
+
+        tte_file = os.path.join(path, "glg_tte_{:s}_{:s}_v{:s}.fit".format(sdet, trigger_name, tte_ver))
+        tte = GBMTTEFile(ttefile=tte_file)
+ 
+        str_info, date, sod = tte.get_info(e_bounds)
+        lc.add_info(sdet, str_info)
+
+        print(tte_file, sdet)
+        print(e_bounds)
+
         for res in resolution:
             bins, counts = tte.get_multichannel_lc(res, e_bounds)
             #print("Det, res: ", det, res[2])
-            lc.add_lc(det, res[2], bins, counts)
-    
-    for res in resolution:
-        bins, counts, str_info = lc.get_sum_det_lc(res[2])
-        print_data(path, date, sod, res[2], bins, counts, str_info)
+            lc.add_lc(sdet, res[2], bins, counts)
+
+    if all_det:
+        for det in detectors:
+
+            sdet = det
+            if len(det) == 1:
+                sdet = "n{:s}".format(det)
+
+            for res in resolution:
+                bins, counts, str_info = lc.get_lc(sdet, res[2])
+                print_data(path, date, sod, res[2], bins, counts, str_info, det=sdet)
+
+    else:
+        for res in resolution:
+            bins, counts, str_info = lc.get_sum_det_lc(res[2])
+            print_data(path, date, sod, res[2], bins, counts, str_info)
 
 def tte_to_ascii_continous(path, date_, hour, tte_ver, t0_met, lst_det, ecl_lat):
 
@@ -481,10 +507,14 @@ def tte_to_ascii_continous(path, date_, hour, tte_ver, t0_met, lst_det, ecl_lat)
 
 if __name__ == "__main__":
 
-    path = '../GRB20220412_T61608'
+    path = '../GRB20250720_T68230'
 
     # Build lc from trigger tte data
     tte_to_ascii(path)
+
+    # Build lcs for all detectors given in detectors.dat.
+    # was tested using GRB20221009_T47819
+    #tte_to_ascii(path, all_det=True)
 
     # Build lc from continous tte data
     t0_met = 671476014.072000

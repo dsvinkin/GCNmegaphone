@@ -18,7 +18,7 @@ if __name__ == "__main__":
     info = read_config('config.yaml')
     #print(info)
 
-    #keys = "telegram_proxy bot_token chat_id log_dir HEND".split()
+    
     keys = info.keys()
     for key in keys:
         print("{:16s}: {:s}".format(key, str(info[key]) ))

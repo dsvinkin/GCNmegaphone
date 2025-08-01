@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import sys
 import os
 import logging as log
 
@@ -29,6 +30,9 @@ import setlog
 setlog.set_log()
 
 def eph(file_trigdat, path):
+
+    #print(file_trigdat, path)
+    #sys.exit()
 
     hdul = fits.open(os.path.join(path, file_trigdat))
     trigtime = hdul[0].header['TRIGTIME']

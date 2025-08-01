@@ -27,8 +27,6 @@ CHANNEL CHANNEL
 
 """
 
-from __future__ import print_function
-
 import datetime
 import os
 import re
@@ -50,7 +48,7 @@ class trig_dat:
     e_bounds = ((4, 12), (12, 26), (26, 50), (50, 102), (102, 290), 
              (290, 542), (542, 1000), (1000, 2000)) # approximate boundaries keV
 
-    i_e_min = 3 # min channel index 
+    i_e_min = 4 # min channel index 
     i_e_max = 6 # max channel index 
 
     def __init__(self, fits_name):
@@ -175,14 +173,18 @@ def trigdat2ascii(fits_name):
     t_dat.print_thr(os.path.dirname(fits_name))
 
 if __name__ == '__main__':
+    """
+    10000100010000
+    0123456789ab
+    """
 
-    path = './data' 
-    trigger_name = 'bn190810675'
-    lst_det = [1,2,3,5]
+    path = '../GRB20220426_T24591' 
+    trigger_name = 'bn220426285'
+    lst_det = [0,1,2,5,10]
     ver ='01'
-    
-    show_sys_info()
+
 
     fits_name = os.path.join(path, "glg_trigdat_all_{:s}_v{:s}.fit".format(trigger_name, ver))
     t_dat = trig_dat(fits_name)
-    t_dat.print_thr('data',lst_det)
+    t_dat.show_info()
+    t_dat.print_thr(path, lst_det)

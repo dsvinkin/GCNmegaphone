@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function
 
 import os
 import datetime
@@ -18,8 +17,8 @@ import gcn.notice_types
 import config
 import telegram_api
 import get_fermi
-import get_integral
-import get_hend 
+#import get_integral
+
 
 info = config.read_config('config.yaml')
 
@@ -30,7 +29,7 @@ setlog.set_log()
 
 current_event_fermi = None
 current_event_integral = None
-current_event_hend = None
+#current_event_hend = None
 
 # See https://gcn.gsfc.nasa.gov/filtering.html
 good_notice_types = {
@@ -129,6 +128,7 @@ def run_download_gbm_thread(event_name, event_gbm_name, path):
     else:
         log.info ("The thread {:s} is already working".format(event_name+'_FER'))
 
+"""
 def run_download_int_thread(event_name, date, time, path):
   
     global current_event_integral
@@ -140,7 +140,8 @@ def run_download_int_thread(event_name, date, time, path):
         current_event_integral = event_name
     else:
         log.info ("The thread {:s} is already working".format(event_name+'_INT'))
-
+"""
+"""
 def run_download_hend_thread(event_name, date, time, path):
 
     global current_event_hend
@@ -152,6 +153,7 @@ def run_download_hend_thread(event_name, date, time, path):
         current_event_hend = event_name
     else:
         log.info("The thread {:s} is already working".format(event_name+'_HEND'))
+"""
 
 class notice:
 
@@ -242,7 +244,7 @@ class notice:
 
         str_date_time = self.dict_par.get('ISOTime', None)
        
-        time = datetime.datetime.strptime(str_date_time, "%Y-%m-%dT%H:%M:%S.%f")
+        time = datetime.datetime.strptime(str_date_time.replace('Z', ''), "%Y-%m-%dT%H:%M:%S.%f")
         part_day = int(round((time.hour*60 + time.minute + time.second/60.0) / 1.44))
       
         # gbm_name - format yymmddttt
@@ -313,19 +315,22 @@ class notice:
 def process_gcn(payload, root):
 
     data = notice(payload)
-    data.append_payload_to_file("{:s}/{:s}".format(info['log_dir'],'raw_notices.txt'))
+    data.append_payload_to_file("{:s}/{:s}".format(info['log_dir'], 'raw_notices.txt'))
 
-    # Respond to only real 'observation' events
-    if (data.role != 'observation'):
-        #print ("data.role != observation")
-        return
-  
     notice_type = good_notice_types.get(data.get_value('Packet_Type'), None)
     print("Recieved Packet_Type: {:s} - {:s}".format(data.get_value('Packet_Type'), notice_type)) 
+    print (f"{data.role=}")
 
+    #set_roles_to_respond = set(['observation', 'test'])
+    set_roles_to_respond = set(['observation',])
+
+    # Respond to only real 'observation' events
+    if data.role not in set_roles_to_respond:
+        print (f"Skip notice with role {data.role=}")
+        return
+  
     if not notice_type:
         return
-
 
     event_date_time = data.get_event_time()
     event_name, event_gbm_name, event_date, event_time = data.get_event_name()
@@ -338,11 +343,19 @@ def process_gcn(payload, root):
 
     if MOST_LIKELY_IND is not None:
         if MOST_LIKELY_IND not in GoodIndex:
-            log.info ("MOST_LIKELY_IND is {:s} ({:s}), skip this event!".format(MOST_LIKELY_IND, AllIndex.get(MOST_LIKELY_IND, 'N/A')))
+            log.info("MOST_LIKELY_IND is {:s} ({:s}), skip this event!".format(MOST_LIKELY_IND, AllIndex.get(MOST_LIKELY_IND, 'N/A')))
             return
         else:
-            log.info ("MOST_LIKELY_IND is {:s} ({:s}), write event info to a file.".format(MOST_LIKELY_IND, AllIndex.get(MOST_LIKELY_IND, 'N/A')))
+            log.info("MOST_LIKELY_IND is {:s} ({:s}), write event info to a file.".format(MOST_LIKELY_IND, AllIndex.get(MOST_LIKELY_IND, 'N/A')))
   
+    if data.get_event_type() == 'GW':
+        #Send Telegram notification and download data
+        #print(data.get_value(Terrestrial))
+        telegram_api.send_to_telegram(data, notice_type, event_date_time, event_name)
+        return
+
+    telegram_api.send_to_telegram(data, notice_type, event_date_time, event_name)
+
     path = "{:s}/{:s}".format(info['data_dir'], event_name)
     if not os.path.exists(path):
         os.mkdir(path)
@@ -352,17 +365,14 @@ def process_gcn(payload, root):
     file_name = "{:s}/{:s}_{:s}.txt".format(path, event_name, notice_type[:3])
     data.append_info_to_file(file_name)
 
-    #Send Telegram notification and download data
-    telegram_api.send_to_telegram(data, notice_type, event_date_time, event_name)
-
     if notice_type in ('FERMI GBM FLT POS', 'FERMI GBM GND POS', 'FERMI GBM FIN POS'):
         run_download_gbm_thread(event_name, event_gbm_name, path)
-        run_download_int_thread(event_name, event_date, int(event_time), path)
-        run_download_hend_thread(event_name, event_date, int(event_time), path)
+        #run_download_int_thread(event_name, event_date, int(event_time), path)
+        #run_download_hend_thread(event_name, event_date, int(event_time), path)
 
-    elif notice_type in ('INTEGRAL SPIACS', 'IPN RAW', 'LVC_PRELIM'):
-        run_download_int_thread(event_name, event_date, int(event_time), path)
-        run_download_hend_thread(event_name, event_date, int(event_time), path)
+    #elif notice_type in ('INTEGRAL SPIACS', 'IPN RAW', 'LVC_PRELIM'):
+        #run_download_int_thread(event_name, event_date, int(event_time), path)
+        #run_download_hend_thread(event_name, event_date, int(event_time), path)
 
 if __name__ == "__main__":
     # Listen for GCNs until the program is interrupted (killed or interrupted with control-C).

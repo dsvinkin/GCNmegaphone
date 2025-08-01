@@ -16,90 +16,94 @@ r3 = sqrt(-2*ln(p3))
 import os
 import numpy as np
 import healpy as hp
-
-import ligo.skymap.postprocess.contour as contour
-from ligo.skymap.io import fits
+import meander
 
 
-def get_pos_center(prob):
+def get_most_prob_loc(probs):
 
-    # Most probable sky location
-    ipix_max = np.argmax(prob)
+    ipix_max = np.argmax(probs)
+    nside = hp.pixelfunc.get_nside(probs)
 
-    npix = len(prob)
-    nside = hp.npix2nside(npix)
-    theta, phi = hp.pix2ang(nside, ipix_max, nest=True)
-    
-
+    theta, phi = hp.pix2ang(nside, ipix_max)
     ra = np.rad2deg(phi)
     dec = np.rad2deg(0.5 * np.pi - theta)
-
     return ra, dec
 
-def print_contour(lst_cont, levels, file_name):
+def compute_contours(proportions, samples):
+    r''' Plot containment contour around desired level.
+    E.g 90% containment of a PDF on a healpix map
 
-    n_lev = len(lst_cont)
-    #print(lst_cont)
-    #exit()
+    Parameters:
+    -----------
+    proportions: list
+        list of containment level to make contours for.
+        E.g [0.68,0.9]
+    samples: array
+        array of values read in from healpix map
+        E.g samples = hp.read_map(file)
+    Returns:
+    --------
+    theta_list: list
+        List of arrays containing theta values for desired contours
+    phi_list: list
+        List of arrays containing phi values for desired contours
+    '''
 
-    f = open(file_name, 'w')
-    for i_lev in range(n_lev):
+    levels = []
+    sorted_samples = list(reversed(list(sorted(samples))))
+    nside = hp.pixelfunc.get_nside(samples)
+    sample_points = np.array(hp.pix2ang(nside,np.arange(len(samples)))).T
+    for proportion in proportions:
+        level_index = (np.cumsum(sorted_samples) > proportion).tolist().index(True)
+        level = (sorted_samples[level_index] + (sorted_samples[level_index+1] if level_index+1 < len(samples) else 0)) / 2.0
+        levels.append(level)
+    contours_by_level = meander.spherical_contours(sample_points, samples, levels)
 
-        n_poly = len(lst_cont[i_lev])
-        print("\nConf level {:8.3f}\nNumber of polygon: {:d}".format(levels[i_lev], n_poly))
-        
-        for i_poly in range(n_poly):
-            n_vert = len(lst_cont[i_lev][i_poly])
-            print("Polygon {:d}: Number of vertices: {:d}".format(i_poly, n_vert))
+    theta_list = []; phi_list=[]
+    for contours in contours_by_level:
+        for contour in contours:
+            theta, phi = contour.T
+            phi[phi<0] += 2.0*np.pi
+            theta_list.append(theta)
+            phi_list.append(phi)
 
-            ra_prev = lst_cont[i_lev][i_poly][0][0]
-            for i_ver in range(n_vert):
-                ra = lst_cont[i_lev][i_poly][i_ver][0]
-                dec = lst_cont[i_lev][i_poly][i_ver][1]
-       
-                if np.abs(ra - ra_prev) >=270.0:
-                    f.write("-- --\n")
+    return theta_list, phi_list
 
-                f.write("{:8.3f} {:8.3f}\n".format(ra, dec))
-                ra_prev = ra
+def print_contours(phi_contour, theta_contour, ra, dec, file_name):
 
-            f.write("-- --\n")
+    with open(file_name, 'w') as f:
+        f.write("RA   Dec\n")
+        f.write("{:8.3f}  {:8.3f}\n--  --\n".format(ra, dec))
 
-    f.close()
+        for arr_phi, arr_theta in zip(phi_contour, theta_contour):
+            ra = np.rad2deg(arr_phi)
+            dec = 90 - np.rad2deg(arr_theta)
+            for i in range(ra.size):
+                f.write("{:8.3f}  {:8.3f}\n".format(ra[i], dec[i]))
+
+            f.write("--  --\n")
 
 def get_contours(path):
     """
-    See https://github.com/lpsinger/ligo.skymap/blob/master/ligo/skymap/tool/ligo_skymap_contour.py
-    
+        
     """
    
     p_1sigma = 0.682689492137
     p_2sigma = 0.954499736104
     p_3sigma = 0.997300203937
-    levels = np.array([p_1sigma, p_2sigma, p_3sigma]) * 100
+    levels = np.array([p_1sigma, p_2sigma, p_3sigma])
  
-    prob, _ = fits.read_sky_map(path, nest=True)
+    probs = hp.read_map(path)
 
-    # Find credible levels
-    i = np.flipud(np.argsort(prob))
-    cumsum = np.cumsum(prob[i])
-    cls = np.empty_like(prob)
-    cls[i] = cumsum * 100
-    
-    lst_cont = contour(cls, levels, degrees=True, nest=True, simplify=False)
-    print(levels, len(lst_cont[0]))
-    #exit()
-
-    ra, dec = get_pos_center(prob)
+    ra, dec = get_most_prob_loc(probs)
     print("Max prob position: {:.3f} {:.3f}".format(ra, dec))
 
-    lst_cont = [[[[ra, dec]]]] + lst_cont # [lev[polys[points[ra, dec]]]]
-    levels = np.append([0], levels)
+    theta_contour, phi_contour = compute_contours(levels, probs)
 
     file_name = os.path.splitext(path)[0] + '_cont.txt'
-    print_contour(lst_cont, levels, file_name)
+    print_contours(phi_contour, theta_contour, ra, dec, file_name)
 
 if __name__ == '__main__':
 
-    path = '../GRB20201103_T22389/glg_healpix_all_bn201103259_v00.fit'
+    path = '../GRB20250620_T58029/glg_healpix_all_bn250620672_v00.fit'
     get_contours(path)
